@@ -1,0 +1,47 @@
+%YAML 1.1
+---
+# Suricata Configuration for Lab
+vars:
+  address-groups:
+    HOME_NET: "[172.16.0.0/12,192.168.0.0/16,10.0.0.0/8]"
+    EXTERNAL_NET: "!$HOME_NET"
+    HTTP_SERVERS: "$HOME_NET"
+
+default-log-dir: /var/log/suricata/
+
+# Salida de logs en formato JSON (EVE log)
+outputs:
+  - eve-log:
+      enabled: yes
+      filetype: regular
+      filename: eve.json
+      types:
+        - alert:
+            payload: yes # Incluir el payload para ver el ataque
+            payload-buffer-size: 4kb
+            payload-printable: yes
+            packet: yes
+            http: yes
+        - http:
+            extended: yes
+        - dns
+        - tls
+        - files
+        - flow
+
+# Configuración de captura (usando af-packet para Linux)
+af-packet:
+  - interface: eth0
+    cluster-id: 99
+    cluster-type: cluster_flow
+    defrag: yes
+
+# Definición de reglas
+default-rule-path: /var/lib/suricata/rules
+rule-files:
+  - /etc/suricata/rules/local.rules
+
+# Límites y ajustes de rendimiento para lab
+threading:
+  set-cpu-affinity: no
+  detect-thread-ratio: 1.0
