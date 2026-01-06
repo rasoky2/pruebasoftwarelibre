@@ -161,9 +161,47 @@ def setup_nginx():
             })
             print("[OK] Configuración de Base de Datos actualizada en config.php.")
         
+        run_system_diagnostics(backend_ip, backend_port)
+
     except Exception as e:
         print(f"[!] Error: {e}")
     print("="*45 + "\n")
+
+def run_system_diagnostics(backend_ip, backend_port):
+    print("\n" + "-"*45)
+    print("   DIAGNÓSTICO FINAL DE INFRAESTRUCTURA")
+    print("-"*45)
+    
+    # 1. Probar Socket del Backend
+    print(f"[*] Probando Backend PHP ({backend_ip}:{backend_port})... ", end="", flush=True)
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(2)
+        if s.connect_ex((backend_ip, int(backend_port))) == 0:
+            print("\033[92m[ONLINE]\033[0m")
+        else:
+            print("\033[91m[OFFLINE]\033[0m (¿Inició 'php -S ...'?)")
+        s.close()
+    except:
+        print("\033[91m[ERROR]\033[0m")
+
+    # 2. Probar Nginx + PHP + DB (End-to-End)
+    url_test = "http://localhost/test.php"
+    print(f"[*] Probando acceso Web + Base de Datos... ", end="", flush=True)
+    try:
+        # Usamos localhost para probar Nginx localmente
+        response = requests.get(url_test, timeout=5)
+        if response.status_code == 200:
+            if "✅ CONECTADO" in response.text:
+                print("\033[92m[TODO OK]\033[0m Nginx -> PHP -> DB funcionando.")
+            else:
+                print("\033[93m[ALERTA]\033[0m PHP responde, pero la DB falla.")
+        else:
+            print(f"\033[91m[FAIL]\033[0m HTTP {response.status_code}")
+    except:
+        print("\033[91m[SIN RESPUESTA]\033[0m Nginx no responde o test.php no existe.")
+    
+    print("-"*45 + "\n")
 
 if __name__ == "__main__":
     setup_nginx()
