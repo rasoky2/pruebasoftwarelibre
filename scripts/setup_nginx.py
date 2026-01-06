@@ -177,14 +177,24 @@ def setup_nginx():
 
         # 4. Actualización opcional de DB (config.php)
         if input("\n¿Desea actualizar la IP y credenciales de la Base de Datos en config.php? (s/N): ").lower() == 's':
-            db_host = input("IP del Servidor MySQL: ")
+            # Cargar sugerencias de .env para consistencia
+            env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env')
+            suggested_db_ip = "127.0.0.1"
+            if os.path.exists(env_path):
+                with open(env_path, 'r') as f:
+                    for line in f:
+                        if "DB_IP=" in line:
+                            suggested_db_ip = line.split('=')[1].strip()
+
+            db_host = input(f"IP del Servidor MySQL [{suggested_db_ip}]: ") or suggested_db_ip
+            db_name = input("Nombre de la DB [lab_vulnerable]: ") or "lab_vulnerable"
             db_user = input("Usuario MySQL [webuser]: ") or "webuser"
             db_pass = input("Contraseña MySQL [web123]: ") or "web123"
             
             from setup_inventory import update_config_php
             update_config_php({
                 "DB_HOST": db_host,
-                "DB_NAME": "lab_vulnerable",
+                "DB_NAME": db_name,
                 "DB_USER": db_user,
                 "DB_PASS": db_pass
             })

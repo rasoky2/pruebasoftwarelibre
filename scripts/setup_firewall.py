@@ -356,26 +356,33 @@ def setup_firewall():
         print(f"\n{Colors.HEADER}[*] Configurando FIREWALL para BASE DE DATOS...{Colors.ENDC}")
         nginx_ip = input(f"{Colors.OKBLUE}Ingrese IP del Nodo Nginx (Web Server) [{suggested_nginx}]: {Colors.ENDC}") or suggested_nginx
         
-        # 1. PING: Permitir desde Nginx también (no solo Admin)
+        # 1. Conectividad Básica (PING/ICMP)
+        # Permitir que Nginx y Admin puedan saber si el servidor está vivo
+        run_cmd(f"sudo iptables -A INPUT -p icmp -s {admin_ip} -j ACCEPT", silent=True)
         if nginx_ip and nginx_ip != "127.0.0.1":
             run_cmd(f"sudo iptables -A INPUT -p icmp -s {nginx_ip} -j ACCEPT", silent=True)
-            print(f"{Colors.OKGREEN}[OK] PING permitido desde Nginx ({nginx_ip}){Colors.ENDC}")
+            print(f"{Colors.OKGREEN}[OK] PING (ICMP) permitido desde Nginx y Admin{Colors.ENDC}")
 
-        # 2. MySQL (3306): Permitir desde Nginx y Admin
+        # 2. Puerto MySQL (3306)
+        # Solo Nginx (para la web) y Admin (para gestión) pueden entrar
         if nginx_ip and nginx_ip != "127.0.0.1":
             run_cmd(f"sudo iptables -A INPUT -p tcp -s {nginx_ip} --dport 3306 -j ACCEPT", silent=True)
-            print(f"{Colors.OKGREEN}[OK] MySQL (3306) accesible desde Nginx ({nginx_ip}){Colors.ENDC}")
+            print(f"{Colors.OKGREEN}[OK] MySQL (3306) permitido para Nginx ({nginx_ip}){Colors.ENDC}")
         
         run_cmd(f"sudo iptables -A INPUT -p tcp -s {admin_ip} --dport 3306 -j ACCEPT", silent=True)
-        print(f"{Colors.OKGREEN}[OK] MySQL (3306) accesible desde Admin ({admin_ip}){Colors.ENDC}")
+        print(f"{Colors.OKGREEN}[OK] MySQL (3306) permitido para Admin ({admin_ip}){Colors.ENDC}")
         
-        # 3. Health Server (5001): Permitir acceso para monitoreo
-        run_cmd(f"sudo iptables -A INPUT -p tcp --dport 5001 -j ACCEPT", silent=True)
-        print(f"{Colors.OKGREEN}[OK] Health Server (5001) abierto para monitoreo{Colors.ENDC}")
+        # 3. Health Server (5001)
+        # Solo permitimos que los nodos de confianza vean el estado de la DB
+        run_cmd(f"sudo iptables -A INPUT -p tcp -s {admin_ip} --dport 5001 -j ACCEPT", silent=True)
+        if nginx_ip and nginx_ip != "127.0.0.1":
+            run_cmd(f"sudo iptables -A INPUT -p tcp -s {nginx_ip} --dport 5001 -j ACCEPT", silent=True)
+        print(f"{Colors.OKGREEN}[OK] Health Server (5001) restringido a Nginx/Admin{Colors.ENDC}")
         
-        # Bloquear todo lo demás
+        # Bloquear todo lo demás (Política DROP)
         run_cmd("sudo iptables -P INPUT DROP", silent=True)
-        print(f"{Colors.WARNING}[OK] Política por defecto: DROP (Solo Admin y Nginx permitidos){Colors.ENDC}")
+        print(f"\n{Colors.WARNING}⚠️  RECUERDA: MySQL debe escuchar en 0.0.0.0 o tu IP de red.{Colors.ENDC}")
+        print(f"{Colors.WARNING}   Verifica /etc/mysql/mysql.conf.d/mysqld.cnf (bind-address).{Colors.ENDC}")
 
     elif choice == '2':
         print(f"\n{Colors.HEADER}[*] Configurando FIREWALL para NGINX (Web)...{Colors.ENDC}")
