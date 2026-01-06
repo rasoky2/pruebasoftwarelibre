@@ -1,13 +1,5 @@
 <?php
 /**
- * search.php - Buscador de Productos (Vulnerable a SQLi)
- */
-require_once 'config.php';
-
-$search = isset($_GET['q']) ? $_GET['q'] : '';
-
-// Conexión a la base de datos<?php
-/**
  * BUSCADOR PROTEGIDO CON INTERBLOQUEO LDAP-DB
  */
 require_once 'config.php'; // Esto ya maneja la sesión y las credenciales protegidas
@@ -21,20 +13,24 @@ if (!isset($_SESSION['user'])) {
          </div>");
 }
 
+$search = isset($_GET['q']) ? $_GET['q'] : '';
+
 // Intentar conexión con las credenciales que config.php nos entregó
 $conn = new mysqli($DB_HOST, $DB_USER, $DB_PASS, $DB_NAME);
 
 if ($conn->connect_error) {
-    // Asumiendo que $is_authorized se establecería en config.php o en un proceso de autenticación LDAP previo.
-    // Si no está definida, esta condición siempre será verdadera si la conexión falla.
-    // Para este ejemplo, si no hay una variable $is_authorized, se asume que no hay autorización LDAP activa.
     if (!isset($is_authorized) || !$is_authorized) {
-        die("🔒 <b>SISTEMA BLOQUEADO:</b> No tienes autorización LDAP activa para ver la Base de Datos.");
+        die("<div style='background:#fef2f2; border:1px solid #fee2e2; padding:2rem; border-radius:1rem; margin-top:2rem; font-family:sans-serif;'>
+                <h2 style='color:#991b1b; margin-top:0;'>🔒 SISTEMA BLOQUEADO</h2>
+                <p style='color:#b91c1c;'>No tienes una sesión de LDAP activa que te permita acceder a la Base de Datos.</p>
+                <p style='color:#7f1d1d; font-size:0.875rem;'>Por favor, vuelve al login y selecciona 'Corporativo (LDAP)'.</p>
+                <a href='index.php' style='display:inline-block; margin-top:1rem; padding:0.5rem 1rem; background:#991b1b; color:white; border-radius:0.5rem; text-decoration:none;'>Volver al Login</a>
+             </div>");
     }
     die("❌ Error de Conexión: " . $conn->connect_error);
 }
-?>
-// Lógica de búsqueda VULNERABLE (SQL Injection intencional)
+
+// Lógica de búsqueda VULNERABLE (SQL Injection intencional para el lab)
 $sql = "SELECT * FROM products WHERE name LIKE '%$search%' OR description LIKE '%$search%'";
 $result = $conn->query($sql);
 
@@ -79,9 +75,12 @@ $result = $conn->query($sql);
                     <i data-lucide="shopping-bag" class="text-blue-600 h-6 w-6"></i>
                     <h1 class="text-xl font-bold tracking-tight">Light Store</h1>
                 </div>
-                <a href="index.php" class="text-sm font-medium text-slate-500 hover:text-slate-900 flex items-center gap-1">
-                    <i data-lucide="log-out" class="h-4 w-4"></i> Salir
-                </a>
+                <div class="flex items-center gap-4">
+                    <span class="text-xs text-slate-400">Usuario: <span class="font-bold text-slate-700"><?php echo htmlspecialchars($_SESSION['user']); ?></span></span>
+                    <a href="logout.php" class="text-sm font-medium text-slate-500 hover:text-slate-900 flex items-center gap-1">
+                        <i data-lucide="log-out" class="h-4 w-4"></i> Salir
+                    </a>
+                </div>
             </div>
 
             <form action="search.php" method="GET" class="relative group">
@@ -100,7 +99,7 @@ $result = $conn->query($sql);
             
             <?php if ($search): ?>
                 <p class="text-xs text-slate-400 mt-4">
-                    Resultados para: <span class="text-slate-900 font-medium font-mono text-xs">"<?php echo $search; ?>"</span>
+                    Resultados para: <span class="text-slate-900 font-medium font-mono text-xs">"<?php echo htmlspecialchars($search); ?>"</span>
                 </p>
             <?php endif; ?>
         </div>
@@ -118,12 +117,12 @@ $result = $conn->query($sql);
                             <i data-lucide="box" class="text-slate-400 h-6 w-6"></i>
                         </div>
                         <div>
-                            <h3 class="font-bold text-slate-900 mb-1"><?php echo $row['name']; ?></h3>
-                            <p class="text-sm text-slate-500 leading-relaxed"><?php echo $row['description']; ?></p>
+                            <h3 class="font-bold text-slate-900 mb-1"><?php echo htmlspecialchars($row['name']); ?></h3>
+                            <p class="text-sm text-slate-500 leading-relaxed"><?php echo htmlspecialchars($row['description']); ?></p>
                         </div>
                         <div class="mt-auto pt-4 flex items-center justify-between">
                             <span class="text-xs font-bold text-blue-600 uppercase tracking-widest">En Stock</span>
-                            <button class="text-xs font-medium text-slate-400 hover:text-slate-900 transition-colors">Ver detalles</button>
+                            <span class="text-sm font-bold text-slate-900">$<?php echo $row['price'] ?? '0.00'; ?></span>
                         </div>
                     </div>
                     <?php
@@ -144,7 +143,8 @@ $result = $conn->query($sql);
 
         <!-- Debug Info (Opcional para el lab) -->
         <div class="mt-20 pt-10 border-t border-dashed border-slate-200">
-            <p class="text-[10px] text-slate-300 font-mono">DEBUG SQL: <?php echo $sql; ?></p>
+            <p class="text-[10px] text-slate-300 font-mono italic">Lab Debug: Vulnerable Query</p>
+            <p class="text-[10px] text-slate-400 font-mono bg-slate-50 p-2 mt-1 rounded border border-slate-100"><?php echo $sql; ?></p>
         </div>
     </main>
 
