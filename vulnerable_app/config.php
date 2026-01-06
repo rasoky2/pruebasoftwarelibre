@@ -25,12 +25,14 @@ $is_authorized = (isset($_SESSION['ldap_auth']) && $_SESSION['ldap_auth'] === tr
 
 if ($is_authorized) {
     $DB_HOST = isset($_ENV['DB_IP']) ? $_ENV['DB_IP'] : '127.0.0.1';
-    $DB_USER = 'webuser';
-    $DB_PASS = 'web123';
-    $DB_NAME = 'lab_vulnerable';
+    $DB_PORT = isset($_ENV['DB_PORT']) ? $_ENV['DB_PORT'] : '3306';
+    $DB_USER = isset($_ENV['DB_USER']) ? $_ENV['DB_USER'] : 'webuser';
+    $DB_PASS = isset($_ENV['DB_PASS']) ? $_ENV['DB_PASS'] : 'web123';
+    $DB_NAME = isset($_ENV['DB_NAME']) ? $_ENV['DB_NAME'] : 'lab_vulnerable';
 } else {
     // Si no está autorizado, usamos credenciales que fallarán a propósito o valores nulos
     $DB_HOST = 'localhost';
+    $DB_PORT = '3306';
     $DB_USER = 'guest';
     $DB_PASS = '';
     $DB_NAME = 'none';
