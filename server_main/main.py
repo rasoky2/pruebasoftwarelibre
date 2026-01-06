@@ -1,10 +1,34 @@
+from flask import Flask, request, jsonify, render_template
 import subprocess
 import os
 import platform
 import socket
-from flask import Flask, request, jsonify
+import json
+from datetime import datetime
 
 app = Flask(__name__)
+
+# Almacenamiento temporal y persistencia de configuración
+logs_storage = []
+config_path = os.path.join(os.path.dirname(__file__), 'config.json')
+
+def load_config():
+    if os.path.exists(config_path):
+        try:
+            with open(config_path, 'r') as f:
+                return json.load(f)
+        except: pass
+    return {
+        "db_ip": "192.168.1.57",
+        "nginx_ip": "192.168.1.56",
+        "last_update": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    }
+
+def save_config(config):
+    with open(config_path, 'w') as f:
+        json.dump(config, f, indent=4)
+
+current_config = load_config()
 
 # Colores para la terminal (ANSI)
 class Colors:
@@ -19,7 +43,6 @@ class Colors:
 
 def get_network_devices():
     """Escanea dispositivos en la red local usando ARP (Funciona en Linux)"""
-    print(f"\n{Colors.OKBLUE}[*] Escaneando dispositivos en la red...{Colors.ENDC}")
     devices = []
     try:
         # Intentamos usar arp -a (común en Linux/Windows)
@@ -29,8 +52,7 @@ def get_network_devices():
                 ip = line.split('(')[1].split(')')[0]
                 mac = line.split('at ')[1].split(' ')[0] if 'at ' in line else "Desconocida"
                 devices.append({"ip": ip, "mac": mac})
-    except Exception as e:
-        print(f"{Colors.FAIL}Error al escanear red: {e}{Colors.ENDC}")
+    except: pass
     return devices
 
 def get_host_ip():
@@ -46,22 +68,32 @@ def get_host_ip():
         s.close()
     return ip
 
-def block_ip(ip):
-    """Ejecuta el bloqueo del atacante usando iptables"""
-    if platform.system() != "Linux":
-        print(f"{Colors.WARNING}[!] Bloqueo cancelado: iptables solo disponible en Linux.{Colors.ENDC}")
-        return False
-    
-    try:
-        print(f"{Colors.WARNING}[*] Aplicando bloqueo a {ip}...{Colors.ENDC}")
-        # Comando: sudo iptables -A INPUT -s IP -j DROP
-        cmd = ["sudo", "iptables", "-A", "INPUT", "-s", ip, "-j", "DROP"]
-        subprocess.run(cmd, check=True)
-        print(f"{Colors.OKGREEN}[+] IP {ip} bloqueada exitosamente.{Colors.ENDC}")
-        return True
-    except subprocess.CalledProcessError:
-        print(f"{Colors.FAIL}[-] Error: Asegúrate de ejecutar con sudo y tener iptables instalado.{Colors.ENDC}")
-        return False
+# The block_ip function was removed as per the provided edit.
+
+@app.route('/')
+def index():
+    """Renderiza el Dashboard Web Shadcn Light"""
+    return render_template('index.html')
+
+@app.route('/api/get-latest', methods=['GET'])
+def get_latest_logs():
+    """Endpoint para que el frontend obtenga logs nuevos"""
+    global logs_storage
+    latest = list(logs_storage)
+    logs_storage = [] # Limpiamos después de enviar
+    return jsonify(latest)
+
+@app.route('/api/config', methods=['GET', 'POST'])
+def manage_config():
+    global current_config
+    if request.method == 'POST':
+        data = request.json
+        current_config['db_ip'] = data.get('db_ip', current_config['db_ip'])
+        current_config['nginx_ip'] = data.get('nginx_ip', current_config['nginx_ip'])
+        current_config['last_update'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        save_config(current_config)
+        return jsonify({"status": "success", "config": current_config})
+    return jsonify(current_config)
 
 @app.route('/', methods=['POST'])
 def receive_suricata_log():
@@ -70,25 +102,22 @@ def receive_suricata_log():
         if not data:
             return jsonify({"status": "error"}), 400
 
+        # Identificar la IP del Sensor que nos envía el log
+        sensor_ip = request.remote_addr
+        data['sensor_source'] = sensor_ip
+
+        # Almacenamos el log para la web
+        logs_storage.append(data)
+
+        # Si es una alerta, mostrar en consola también
         if data.get('event_type') == 'alert':
             alert = data.get('alert', {})
             src_ip = data.get('src_ip', 'Desconocida')
             signature = alert.get('signature', 'Firma desconocida')
-            severity = alert.get('severity', 0)
-
-            print(f"\n{Colors.BOLD}{Colors.FAIL}[!] ALERTA DETECTADA: {signature} [!]{Colors.ENDC}")
-            print(f"{Colors.OKBLUE}Origen:{Colors.ENDC} {Colors.WARNING}{src_ip}{Colors.ENDC}")
             
-            # Lógica de respuesta activa para Inyección SQL
-            if "SQL Injection" in signature or severity >= 3:
-                print(f"\n{Colors.BOLD}{Colors.FAIL}!!! AMENAZA CRÍTICA DETECTADA !!!{Colors.ENDC}")
-                print(f"{Colors.UNDERLINE}Acción sugerida:{Colors.ENDC}")
-                print(f"Para bloquear al atacante usa: {Colors.BOLD}sudo iptables -A INPUT -s {src_ip} -j DROP{Colors.ENDC}")
-                
-                # Ofrecer bloqueo (Simulado o automático si es crítico)
-                if severity >= 3:
-                    print(f"{Colors.WARNING}>> Se recomienda ejecutar el bloqueo inmediato de {src_ip}.{Colors.ENDC}")
-                    # block_ip(src_ip) # Descomentar para bloqueo automático
+            print(f"\n{Colors.BOLD}{Colors.FAIL}[!] ALERTA DESDE SENSOR {sensor_ip} [!]{Colors.ENDC}")
+            print(f"{Colors.OKBLUE}Ataque:{Colors.ENDC} {signature} | {Colors.OKBLUE}Atacante:{Colors.ENDC} {src_ip}")
+            
         return jsonify({"status": "success"}), 200
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -104,16 +133,8 @@ if __name__ == '__main__':
 
     # Mostrar la IP local del servidor
     host_ip = get_host_ip()
-    print(f"{Colors.BOLD}{Colors.OKBLUE}[ℹ] Servidor ejecutándose en IP: {Colors.WARNING}{host_ip}{Colors.ENDC}")
+    print(f"{Colors.BOLD}{Colors.OKBLUE}[ℹ] Panel Web disponible en: {Colors.WARNING}http://{host_ip}:5000{Colors.ENDC}")
 
-    # Mostrar dispositivos al inicio
-    devs = get_network_devices()
-    if devs:
-        print(f"{Colors.OKGREEN}Dispositivos encontrados:{Colors.ENDC}")
-        for d in devs:
-            print(f"  • {d['ip']} [{d['mac']}]")
-    else:
-        print(f"{Colors.WARNING}No se detectaron otros dispositivos en la caché ARP.{Colors.ENDC}")
-
-    print(f"\n{Colors.OKGREEN}Servidor Main escuchando en puerto 5000...{Colors.ENDC}")
+    print(f"\n{Colors.OKGREEN}Servidor Main y Dashboard iniciados...{Colors.ENDC}")
+    print(f"{Colors.OKBLUE}Configuración actual:{Colors.ENDC} DB: {current_config['db_ip']} | Nginx: {current_config['nginx_ip']}")
     app.run(host='0.0.0.0', port=5000)
