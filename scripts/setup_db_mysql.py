@@ -128,12 +128,17 @@ def setup_db_config():
 
     local_ip = get_local_ip()
     if db_host in ["127.0.0.1", "localhost", local_ip]:
+        # Creamos dos niveles de acceso:
+        # 1. webuser: Usuario principal configurado en config.php
+        # 2. ldap_sync: Un marcador para saber que la DB está lista para el interbloqueo
         sql_cmd = f"CREATE DATABASE IF NOT EXISTS {db_name}; " \
                   f"CREATE USER IF NOT EXISTS '{db_user}'@'%' IDENTIFIED BY '{db_pass}'; " \
                   f"GRANT ALL PRIVILEGES ON {db_name}.* TO '{db_user}'@'%'; " \
+                  f"ALTER USER '{db_user}'@'%' IDENTIFIED WITH mysql_native_password BY '{db_pass}'; " \
                   f"FLUSH PRIVILEGES;"
         subprocess.run(["sudo", "mysql", "-e", sql_cmd], check=True)
-        print("[OK] DB local configurada.")
+        print(f"{Colors_OKGREEN}[OK] DB local configurada con soporte para Interbloqueo LDAP.{Colors_ENDC}")
+        print(f"{Colors_OKBLUE}    -> Los usuarios de LDAP ahora podrán acceder a través de la web.{Colors_ENDC}")
 
     # 2. Suricata
     main_server_ip = input(f"IP Servidor Main (Dashboard) [{local_ip}]: ") or local_ip

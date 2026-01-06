@@ -16,6 +16,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         if (autenticar_con_ldap($username, $password)) {
             $_SESSION['user'] = $username;
             $_SESSION['auth_type'] = 'LDAP (Corporativo)';
+            $_SESSION['role'] = 'corporate'; // Asignar rol corporativo
+            $_SESSION['ldap_auth'] = true; // Marcar que la autenticación fue por LDAP
             header('Location: welcome.php');
             exit;
         } else {
@@ -31,6 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             if ($user) {
                 $_SESSION['user'] = $user['username'];
                 $_SESSION['auth_type'] = 'Base de Datos (Tradicional)';
+                $_SESSION['role'] = 'basic'; // Asignar rol básico
                 header('Location: welcome.php');
                 exit;
             } else {

@@ -18,14 +18,24 @@ function loadEnv($path) {
 loadEnv(__DIR__ . '/../.env');
 
 // Base de Datos (Prioriza .env, fallback a valores por defecto)
-$DB_HOST = isset($_ENV['DB_IP']) ? $_ENV['DB_IP'] : '127.0.0.1';
-$DB_NAME = 'lab_vulnerable';
-$DB_USER = 'webuser';
-$DB_PASS = 'web123';
+// Protección de Interbloqueo LDAP-DB
+session_start();
+$is_authorized = (isset($_SESSION['ldap_auth']) && $_SESSION['ldap_auth'] === true) || (isset($_SESSION['role']) && $_SESSION['role'] === 'basic');
 
-// Configuración de Servidores
-$MAIN_SERVER_IP = isset($_ENV['NGINX_IP']) ? $_ENV['NGINX_IP'] : '127.0.0.1';
-$MAIN_SERVER_PORT = '5000';
+if ($is_authorized) {
+    $DB_HOST = isset($_ENV['DB_IP']) ? $_ENV['DB_IP'] : '127.0.0.1';
+    $DB_USER = 'webuser';
+    $DB_PASS = 'web123';
+    $DB_NAME = 'lab_vulnerable';
+} else {
+    // Si no está autorizado, usamos credenciales que fallarán a propósito o valores nulos
+    $DB_HOST = 'localhost';
+    $DB_USER = 'guest';
+    $DB_PASS = '';
+    $DB_NAME = 'none';
+}
+
+$MAIN_SERVER_IP = isset($_ENV['ADMIN_IP']) ? $_ENV['ADMIN_IP'] : '127.0.0.1';
 $LDAP_HOST = isset($_ENV['LDAP_IP']) ? $_ENV['LDAP_IP'] : '127.0.0.1';
 
 // Rutas
