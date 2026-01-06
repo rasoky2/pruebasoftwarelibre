@@ -12,59 +12,65 @@ def get_local_ip():
         return ip
     except: return "127.0.0.1"
 
+def update_env(updates):
+    env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
+    if not os.path.exists(env_path):
+        with open(env_path, "w") as f: f.write("# Config\n")
+    
+    with open(env_path, "r") as f:
+        lines = f.readlines()
+    
+    new_lines = []
+    keys_updated = set()
+    for line in lines:
+        updated = False
+        for key, value in updates.items():
+            if line.startswith(f"{key}="):
+                new_lines.append(f"{key}={value}\n")
+                keys_updated.add(key)
+                updated = True
+                break
+        if not updated: new_lines.append(line)
+            
+    for key, value in updates.items():
+        if key not in keys_updated:
+            new_lines.append(f"{key}={value}\n")
+            
+    with open(env_path, "w") as f:
+        f.writelines(new_lines)
+    print(f"[+] .env actualizado.")
+
 def setup_inventory():
     print("\n" + "="*50)
     print("   CONFIGURADOR GLOBAL DE INFRAESTRUCTURA")
     print("="*50)
 
-    # 1. Configuración de Red Local
     local_ip = get_local_ip()
-    print(f"[*] IP actual detectada: {local_ip}")
-
-    # 2. Configuración de Base de Datos
-    print("\n[ DATOS DE MYSQL ]")
     db_host = input(f"IP Servidor MySQL [10.172.86.69]: ") or "10.172.86.69"
-    db_user = input(f"Usuario MySQL [webuser]: ") or "webuser"
-    db_pass = input("Contraseña de MySQL [web123]: ") or "web123"
+    db_user = "webuser"
+    db_pass = "web123"
+    ldap_host = input("IP Servidor LDAP [10.172.86.161]: ") or "10.172.86.161"
+    main_ip = input(f"IP Dashboard Main [{local_ip}]: ") or local_ip
 
-    # 3. Configuración de LDAP (Agustín)
-    print("\n[ DATOS DE LDAP (AGUSTÍN) ]")
-    ldap_host = input("IP Servidor LDAP de Agustín [10.172.86.161]: ") or "10.172.86.161"
-    
-    # 4. Configuración Dashboard Main
-    print("\n[ DATOS DEL DASHBOARD MAIN ]")
-    main_ip = input(f"IP del Servidor Python Dashboard [{local_ip}]: ") or local_ip
+    # Actualizar .env
+    update_env({
+        "DB_HOST": db_host,
+        "DB_USER": db_user,
+        "DB_PASS": db_pass,
+        "MAIN_SERVER_IP": main_ip,
+        "SURICATA_SENSOR_IP": local_ip,
+        "LDAP_HOST": ldap_host
+    })
 
-    # --- Actualización de .env ---
-    env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
-    if os.path.exists(env_path):
-        print(f"\n[*] Actualizando archivo .env...")
-        with open(env_path, "r") as f:
-            lines = f.readlines()
-        
-        with open(env_path, "w") as f:
-            for line in lines:
-                if line.startswith("DB_HOST="): f.write(f"DB_HOST={db_host}\n")
-                elif line.startswith("DB_USER="): f.write(f"DB_USER={db_user}\n")
-                elif line.startswith("DB_PASS="): f.write(f"DB_PASS={db_pass}\n")
-                elif line.startswith("MAIN_SERVER_IP="): f.write(f"MAIN_SERVER_IP={main_ip}\n")
-                elif line.startswith("SURICATA_SENSOR_IP="): f.write(f"SURICATA_SENSOR_IP={local_ip}\n")
-                else: f.write(line)
-        print("[+] .env actualizado.")
+    # Actualizar auth_ldap.php
+    php_path = os.path.join(os.path.dirname(__file__), "..", "vulnerable_app", "auth_ldap.php")
+    if os.path.exists(php_path):
+        with open(php_path, "r") as f: content = f.read()
+        content = re.sub(r'\$ldap_host\s*=\s*".*?";', f'$ldap_host = "{ldap_host}";', content)
+        with open(php_path, "w") as f: f.write(content)
+        print("[+] Módulo LDAP sincronizado.")
 
-    # --- Actualización de auth_ldap.php ---
-    ldap_php_path = os.path.join(os.path.dirname(__file__), "..", "vulnerable_app", "auth_ldap.php")
-    if os.path.exists(ldap_php_path):
-        print(f"[*] Actualizando IP de Agustín en auth_ldap.php...")
-        with open(ldap_php_path, "r") as f:
-            content = f.read()
-        
-        # Regex para buscar la variable $ldap_host
-        new_content = re.sub(r'\$ldap_host\s*=\s*".*?";', f'$ldap_host = "{ldap_host}";', content)
-        
-        with open(ldap_php_path, "w") as f:
-            f.write(new_content)
-        print("[+] Módulo LDAP actualizado.")
+    print("="*50 + "\n")
 
     print("\n" + "="*50)
     print("   ¡CONFIGURACIÓN COMPLETADA!")
