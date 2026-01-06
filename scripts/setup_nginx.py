@@ -27,13 +27,42 @@ def check_package_installed(package_name):
 def install_nginx():
     if check_package_installed("nginx"):
         print("[OK] Nginx ya está instalado.")
-        return
-    print("\n[*] Instalando Nginx...")
+    else:
+        print("\n[*] Instalando Nginx...")
+        try:
+            subprocess.run(["sudo", "apt", "update"], check=True)
+            subprocess.run(["sudo", "apt", "install", "-y", "nginx"], check=True)
+        except Exception as e:
+            print(f"[!] Error al instalar Nginx: {e}")
+    
+    # Asegurar extensión LDAP para PHP
+    install_php_ldap()
+
+def install_php_ldap():
+    print("\n[*] Verificando extensión PHP LDAP...")
+    
+    # Detectar versión de PHP instalada
     try:
+        php_v = subprocess.run(["php", "-r", "echo PHP_MAJOR_VERSION.'.'.PHP_MINOR_VERSION;"], capture_output=True, text=True).stdout.strip()
+        pkg_name = f"php{php_v}-ldap"
+        
+        if check_package_installed(pkg_name):
+            print(f"[OK] Extensión {pkg_name} ya está instalada.")
+            return
+            
+        print(f"[*] Instalando extensión {pkg_name}...")
         subprocess.run(["sudo", "apt", "update"], check=True)
-        subprocess.run(["sudo", "apt", "install", "-y", "nginx"], check=True)
+        subprocess.run(["sudo", "apt", "install", "-y", pkg_name], check=True)
+        
+        # Reiniciar PHP-FPM para aplicar cambios
+        fpm_service = f"php{php_v}-fpm"
+        subprocess.run(["sudo", "systemctl", "restart", fpm_service], check=False)
+        subprocess.run(["sudo", "systemctl", "restart", "nginx"], check=True)
+        print(f"[OK] Extensión LDAP instalada y servicios reiniciados.")
+        
     except Exception as e:
-        print(f"[!] Error al instalar Nginx: {e}")
+        print(f"[!] No se pudo instalar php-ldap automáticamente: {e}")
+        print("[!] Por favor, ejecuta: sudo apt install php-ldap")
 
 def install_suricata():
     if check_package_installed("suricata"):

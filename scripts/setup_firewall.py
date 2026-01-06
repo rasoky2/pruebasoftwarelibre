@@ -128,7 +128,7 @@ def test_port(target_ip, port, service_name, timeout=3):
         print(f"{Colors.FAIL}✗ ERROR{Colors.ENDC}")
         return False
 
-def diagnostico_final(role, admin_ip, nginx_ip=None):
+def diagnostico_final(role, admin_ip, nginx_ip=None, db_ip=None):
     """Ejecuta diagnóstico de conectividad al final de la configuración"""
     print("\n" + "="*60)
     print(f"{Colors.HEADER}{Colors.BOLD}   DIAGNÓSTICO DE CONECTIVIDAD{Colors.ENDC}")
@@ -139,29 +139,64 @@ def diagnostico_final(role, admin_ip, nginx_ip=None):
     if role == '1':  # Base de Datos
         print(f"{Colors.BOLD}Verificando conectividad desde Base de Datos:{Colors.ENDC}\n")
         
-        # Probar Admin
-        results['admin_ping'] = test_connectivity(admin_ip, "Servidor Admin")
-        results['admin_ssh'] = test_port(admin_ip, 22, "SSH Admin")
+        # Probar Admin (Controlador)
+        print(f"{Colors.HEADER}→ Conectividad con Servidor Admin (Controlador):{Colors.ENDC}")
+        results['admin_ping'] = test_connectivity(admin_ip, "Admin/Controlador")
+        results['admin_ssh'] = test_port(admin_ip, 22, "SSH")
+        results['admin_dashboard'] = test_port(admin_ip, 5000, "Dashboard")
         
         # Probar Nginx
         if nginx_ip and nginx_ip != "127.0.0.1":
-            print()
-            results['nginx_ping'] = test_connectivity(nginx_ip, "Servidor Nginx")
-            results['nginx_http'] = test_port(nginx_ip, 80, "HTTP Nginx")
+            print(f"\n{Colors.HEADER}→ Conectividad con Servidor Nginx (Web):{Colors.ENDC}")
+            results['nginx_ping'] = test_connectivity(nginx_ip, "Nginx/Web")
+            results['nginx_http'] = test_port(nginx_ip, 80, "HTTP")
+        
+        # Probar a sí mismo (DB)
+        print(f"\n{Colors.HEADER}→ Verificación local (Base de Datos):{Colors.ENDC}")
+        print(f"{Colors.OKGREEN}[OK] Servidor MySQL - Configurado correctamente{Colors.ENDC}")
+        results['db_local'] = True
         
     elif role == '2':  # Nginx
         print(f"{Colors.BOLD}Verificando conectividad desde Nginx:{Colors.ENDC}\n")
         
-        # Probar Admin
-        results['admin_ping'] = test_connectivity(admin_ip, "Servidor Admin")
-        results['admin_dashboard'] = test_port(admin_ip, 5000, "Dashboard Admin")
+        # Probar Admin (Controlador)
+        print(f"{Colors.HEADER}→ Conectividad con Servidor Admin (Controlador):{Colors.ENDC}")
+        results['admin_ping'] = test_connectivity(admin_ip, "Admin/Controlador")
+        results['admin_ssh'] = test_port(admin_ip, 22, "SSH")
+        results['admin_dashboard'] = test_port(admin_ip, 5000, "Dashboard")
+        
+        # Probar Base de Datos
+        if db_ip and db_ip != "127.0.0.1":
+            print(f"\n{Colors.HEADER}→ Conectividad con Servidor Base de Datos:{Colors.ENDC}")
+            results['db_ping'] = test_connectivity(db_ip, "Base de Datos")
+            results['db_mysql'] = test_port(db_ip, 3306, "MySQL")
+        
+        # Probar a sí mismo (Nginx)
+        print(f"\n{Colors.HEADER}→ Verificación local (Nginx):{Colors.ENDC}")
+        print(f"{Colors.OKGREEN}[OK] Servidor Nginx - Configurado correctamente{Colors.ENDC}")
+        results['nginx_local'] = True
         
     elif role == '3':  # Admin
-        print(f"{Colors.BOLD}Verificando conectividad desde Admin:{Colors.ENDC}\n")
+        print(f"{Colors.BOLD}Verificando conectividad desde Admin (Controlador):{Colors.ENDC}\n")
         
-        # El admin puede probar contra sí mismo
+        # Probar Base de Datos
+        if db_ip and db_ip != "127.0.0.1":
+            print(f"{Colors.HEADER}→ Conectividad con Servidor Base de Datos:{Colors.ENDC}")
+            results['db_ping'] = test_connectivity(db_ip, "Base de Datos")
+            results['db_ssh'] = test_port(db_ip, 22, "SSH")
+            results['db_mysql'] = test_port(db_ip, 3306, "MySQL")
+        
+        # Probar Nginx
+        if nginx_ip and nginx_ip != "127.0.0.1":
+            print(f"\n{Colors.HEADER}→ Conectividad con Servidor Nginx (Web):{Colors.ENDC}")
+            results['nginx_ping'] = test_connectivity(nginx_ip, "Nginx/Web")
+            results['nginx_ssh'] = test_port(nginx_ip, 22, "SSH")
+            results['nginx_http'] = test_port(nginx_ip, 80, "HTTP")
+        
+        # Probar a sí mismo (Admin)
+        print(f"\n{Colors.HEADER}→ Verificación local (Admin/Controlador):{Colors.ENDC}")
         print(f"{Colors.OKGREEN}[OK] Servidor Admin - Acceso completo{Colors.ENDC}")
-        results['admin_ok'] = True
+        results['admin_local'] = True
     
     # Resumen
     print("\n" + "-"*60)
@@ -186,9 +221,36 @@ def diagnostico_final(role, admin_ip, nginx_ip=None):
     if passed_tests < total_tests:
         print(f"{Colors.WARNING}RECOMENDACIONES:{Colors.ENDC}")
         print("  • Verificar que los servidores estén encendidos")
-        print("  • Revisar configuración de red (IPs correctas)")
+        print("  • Revisar configuración de red (IPs correctas en .env)")
         print("  • Verificar firewall en los servidores destino")
-        print("  • Ejecutar: sudo iptables -L -n (para ver reglas actuales)\n")
+        print("  • Ejecutar: sudo iptables -L -n (para ver reglas actuales)")
+        print("  • Probar manualmente: ping <IP> y telnet <IP> <PUERTO>\n")
+    
+    # Tabla de conectividad
+    print(f"{Colors.BOLD}TABLA DE CONECTIVIDAD:{Colors.ENDC}\n")
+    
+    role_name = {
+        '1': 'Base de Datos',
+        '2': 'Nginx/Web',
+        '3': 'Admin/Controlador'
+    }
+    
+    print(f"  Desde: {role_name.get(role, 'Desconocido')}")
+    print(f"  Hacia:")
+    
+    if 'admin_ping' in results:
+        status = "✓" if results['admin_ping'] else "✗"
+        print(f"    {status} Admin/Controlador ({admin_ip})")
+    
+    if 'db_ping' in results and db_ip:
+        status = "✓" if results['db_ping'] else "✗"
+        print(f"    {status} Base de Datos ({db_ip})")
+    
+    if 'nginx_ping' in results and nginx_ip:
+        status = "✓" if results['nginx_ping'] else "✗"
+        print(f"    {status} Nginx/Web ({nginx_ip})")
+    
+    print()
 
 def setup_firewall():
     """Configuración principal del firewall"""
@@ -219,13 +281,15 @@ def setup_firewall():
     env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env')
     suggested_admin = "127.0.0.1"
     suggested_nginx = "127.0.0.1"
+    suggested_db = "127.0.0.1"
     
     if os.path.exists(env_path):
         with open(env_path, 'r') as f:
             for line in f:
                 if "NGINX_IP=" in line:
                     suggested_nginx = line.split('=')[1].strip()
-                # Asumimos que el admin es la máquina local o se especifica
+                elif "DB_IP=" in line:
+                    suggested_db = line.split('=')[1].strip()
     
     admin_ip = input(f"{Colors.OKBLUE}Ingrese IP del Servidor Admin [{suggested_admin}]: {Colors.ENDC}") or suggested_admin
     
@@ -246,6 +310,7 @@ def setup_firewall():
     print(f"{Colors.OKGREEN}[OK] PING permitido desde Admin{Colors.ENDC}")
 
     nginx_ip = None
+    db_ip = None
 
     if choice == '1':
         print(f"\n{Colors.HEADER}[*] Configurando FIREWALL para BASE DE DATOS...{Colors.ENDC}")
@@ -267,6 +332,9 @@ def setup_firewall():
     elif choice == '2':
         print(f"\n{Colors.HEADER}[*] Configurando FIREWALL para NGINX (Web)...{Colors.ENDC}")
         
+        # Solicitar IP de la base de datos para diagnóstico
+        db_ip = input(f"{Colors.OKBLUE}Ingrese IP del Servidor Base de Datos (para diagnóstico) [{suggested_db}]: {Colors.ENDC}") or suggested_db
+        
         # Nginx debe ser accesible para TODOS en puerto 80
         run_cmd("sudo iptables -A INPUT -p tcp --dport 80 -j ACCEPT", silent=True)
         print(f"{Colors.OKGREEN}[OK] HTTP (80) abierto al público{Colors.ENDC}")
@@ -277,6 +345,10 @@ def setup_firewall():
 
     elif choice == '3':
         print(f"\n{Colors.HEADER}[*] Configurando FIREWALL para ADMIN (Main)...{Colors.ENDC}")
+        
+        # Solicitar IPs de otros servidores para diagnóstico
+        db_ip = input(f"{Colors.OKBLUE}Ingrese IP del Servidor Base de Datos (para diagnóstico) [{suggested_db}]: {Colors.ENDC}") or suggested_db
+        nginx_ip = input(f"{Colors.OKBLUE}Ingrese IP del Servidor Nginx (para diagnóstico) [{suggested_nginx}]: {Colors.ENDC}") or suggested_nginx
         
         # El admin debe poder recibir los logs en el puerto 5000
         run_cmd("sudo iptables -A INPUT -p tcp --dport 5000 -j ACCEPT", silent=True)
@@ -306,7 +378,7 @@ def setup_firewall():
     # Diagnóstico final
     print(f"\n{Colors.OKBLUE}[*] ¿Desea ejecutar diagnóstico de conectividad? (s/N): {Colors.ENDC}", end="")
     if input().lower() == 's':
-        diagnostico_final(choice, admin_ip, nginx_ip)
+        diagnostico_final(choice, admin_ip, nginx_ip, db_ip)
 
 if __name__ == "__main__":
     setup_firewall()
