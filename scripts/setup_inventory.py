@@ -1,7 +1,25 @@
 import os
-import sys
-import re
 import socket
+import json
+import requests
+import re
+
+def get_firebase_config():
+    config_path = os.path.join(os.path.dirname(__file__), "configuration.json")
+    if os.path.exists(config_path):
+        with open(config_path, "r") as f:
+            return json.load(f)
+    return None
+
+def sync_to_firebase(data):
+    config = get_firebase_config()
+    if not config: return
+    url = f"{config['databaseURL']}/infrastructure.json"
+    try:
+        requests.patch(url, json=data)
+        print("[OK] Sincronizado con Firebase.")
+    except Exception:
+        print("[!] Fallo al conectar con Firebase.")
 
 def get_local_ip():
     try:
@@ -44,13 +62,13 @@ def setup_inventory():
     print("\n" + "="*50)
     print("   CONFIGURADOR GLOBAL DE INFRAESTRUCTURA")
     print("="*50)
-
     local_ip = get_local_ip()
+    central_ip = input(f"IP Servidor Central (Dashboard + LDAP) [{local_ip}]: ") or local_ip
     db_host = input(f"IP Servidor MySQL [10.172.86.69]: ") or "10.172.86.69"
     db_user = "webuser"
     db_pass = "web123"
-    ldap_host = input("IP Servidor LDAP [10.172.86.161]: ") or "10.172.86.161"
-    main_ip = input(f"IP Dashboard Main [{local_ip}]: ") or local_ip
+    ldap_host = central_ip
+    main_ip = central_ip
 
     # Actualizar .env
     update_env({
@@ -70,7 +88,13 @@ def setup_inventory():
         with open(php_path, "w") as f: f.write(content)
         print("[+] Módulo LDAP sincronizado.")
 
-    print("="*50 + "\n")
+    # Sincronizar con Firebase
+    sync_to_firebase({
+        "mysql": {"host": db_host, "user": db_user, "password": db_pass},
+        "ldap": {"host": ldap_host},
+        "dashboard": {"host": main_ip},
+        "edge_node": {"host": local_ip}
+    })
 
     print("\n" + "="*50)
     print("   ¡CONFIGURACIÓN COMPLETADA!")

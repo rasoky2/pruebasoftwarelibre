@@ -1,7 +1,25 @@
-import os
-import sys
-import re
 import socket
+import json
+import requests
+import re
+import os
+
+def get_firebase_config():
+    config_path = os.path.join(os.path.dirname(__file__), "configuration.json")
+    if os.path.exists(config_path):
+        with open(config_path, "r") as f:
+            return json.load(f)
+    return None
+
+def sync_to_firebase(data):
+    config = get_firebase_config()
+    if not config: return
+    url = f"{config['databaseURL']}/infrastructure.json"
+    try:
+        requests.patch(url, json=data)
+        print("[OK] Sincronizado con Firebase.")
+    except Exception:
+        print("[!] Fallo al conectar con Firebase.")
 
 def get_local_ip():
     """Detecta la IP local de la interfaz principal"""
@@ -40,7 +58,7 @@ def update_env(updates):
             
     with open(env_path, "w") as f:
         f.writelines(new_lines)
-    print(f"[+] .env actualizado.")
+    print("[+] .env actualizado.")
 
 def setup_suricata():
     print("\n" + "="*45)
@@ -57,7 +75,7 @@ def setup_suricata():
     local_ip = get_local_ip()
     print(f"[*] IP detectada ({role_name}): {local_ip}")
     
-    main_server_ip = input("IP Dashboard Central: ")
+    main_server_ip = input(f"IP del Servidor Central (Dashboard + LDAP) [{local_ip}]: ") or local_ip
 
     # Actualizar .env
     updates = {"MAIN_SERVER_IP": main_server_ip}
@@ -111,6 +129,16 @@ def setup_suricata():
     print("\nComando para iniciar:")
     interface = "eth0" # Podríamos detectarlo, pero eth0 es estándar
     print(f"  sudo suricata -c {suricata_yaml} -i {interface}")
+    
+    # Sincronizar con Firebase
+    sync_to_firebase({
+        "suricata": {
+            "host": local_ip,
+            "main_server": main_server_ip,
+            "rules": local_rules
+        }
+    })
+    
     print("="*45 + "\n")
 
 if __name__ == "__main__":

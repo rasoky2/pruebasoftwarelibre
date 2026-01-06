@@ -1,6 +1,26 @@
 import os
 import sys
 import socket
+import subprocess
+import json
+import requests
+
+def get_firebase_config():
+    config_path = os.path.join(os.path.dirname(__file__), "configuration.json")
+    if os.path.exists(config_path):
+        with open(config_path, "r") as f:
+            return json.load(f)
+    return None
+
+def sync_to_firebase(data):
+    config = get_firebase_config()
+    if not config: return
+    url = f"{config['databaseURL']}/infrastructure.json"
+    try:
+        requests.patch(url, json=data)
+        print("[OK] Sincronizado con Firebase.")
+    except:
+        print("[!] Fallo al conectar con Firebase.")
 
 def get_local_ip():
     try:
@@ -89,8 +109,16 @@ def setup_nginx():
         else:
             print("\n[!] Error en la sintaxis de Nginx. Revise la consola.")
 
-        os.remove("nginx_temp.conf")
+        if os.path.exists("nginx_temp.conf"): os.remove("nginx_temp.conf")
         
+        # Sincronizar con Firebase
+        sync_to_firebase({
+            "nginx": {
+                "host": local_ip,
+                "backend": f"{backend_ip}:{backend_port}",
+                "status": "online"
+            }
+        })
 
     except Exception as e:
         print(f"[!] Error: {e}")

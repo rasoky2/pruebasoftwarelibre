@@ -4,6 +4,25 @@ import socket
 import subprocess
 import re
 import yaml
+import json
+import requests
+
+def get_firebase_config():
+    config_path = os.path.join(os.path.dirname(__file__), "configuration.json")
+    if os.path.exists(config_path):
+        with open(config_path, "r") as f:
+            return json.load(f)
+    return None
+
+def sync_to_firebase(data):
+    config = get_firebase_config()
+    if not config: return
+    url = f"{config['databaseURL']}/infrastructure.json"
+    try:
+        requests.patch(url, json=data)
+        print("[OK] Sincronizado con Firebase.")
+    except Exception:
+        print("[!] Fallo al conectar con Firebase.")
 
 def check_internet():
     print("[*] Verificando conexión a Internet...")
@@ -12,7 +31,7 @@ def check_internet():
         socket.create_connection(("8.8.8.8", 53), timeout=3)
         print("[OK] Conexión a Internet detectada.")
         return True
-    except OSError:
+    except Exception:
         print("[!] Error: No hay conexión a Internet.")
         return False
 
@@ -23,7 +42,7 @@ def get_local_ip():
         ip = s.getsockname()[0]
         s.close()
         return ip
-    except: return "127.0.0.1"
+    except Exception: return "127.0.0.1"
 
 def update_env(updates):
     env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
@@ -54,7 +73,7 @@ def update_env(updates):
             
     with open(env_path, "w") as f:
         f.writelines(new_lines)
-    print(f"[+] Archivo .env actualizado en {env_path}")
+    print("[+] .env actualizado.")
 
 def install_php_ldap():
     print("\n[*] Instalando extensión LDAP para PHP...")
@@ -81,7 +100,7 @@ def get_default_gateway():
         for line in result.stdout.splitlines():
             if "default via" in line:
                 return line.split()[2]
-    except:
+    except Exception:
         pass
     return "10.172.86.1" # Fallback común en tu red
 
@@ -91,7 +110,7 @@ def configure_netplan():
     # Detectar Interfaz automáticamente
     try:
         interface = subprocess.check_output("ip -o link show | awk -F': ' '{print $2}' | grep -v 'lo' | head -n1", shell=True).decode().strip()
-    except:
+    except Exception:
         interface = "ens33"
 
     gateway = get_default_gateway()
@@ -128,14 +147,15 @@ def configure_netplan():
     yamls = [f for f in os.listdir(netplan_dir) if f.endswith(".yaml")]
     target_file = os.path.join(netplan_dir, yamls[0] if yamls else "01-netcfg.yaml")
 
+    TEMP_NETPLAN = "temp_netplan.yaml"
     try:
-        with open("temp_netplan.yaml", "w") as f:
+        with open(TEMP_NETPLAN, "w") as f:
             yaml.dump(config, f, default_flow_style=False)
-        subprocess.run(["sudo", "cp", "temp_netplan.yaml", target_file], check=True)
+        subprocess.run(["sudo", "cp", TEMP_NETPLAN, target_file], check=True)
         print("[*] Aplicando Netplan...")
         subprocess.run(["sudo", "netplan", "apply"], check=True)
         print("[OK] Red configurada.")
-        os.remove("temp_netplan.yaml")
+        if os.path.exists(TEMP_NETPLAN): os.remove(TEMP_NETPLAN)
     except Exception as e:
         print(f"[!] Error en Netplan: {e}")
 
@@ -167,8 +187,9 @@ def main():
     db_user = "webuser"
     db_pass = "web123"
     
-    ldap_server_ip = input("IP de la Computadora Principal (LDAP Agustín) [10.172.86.161]: ") or "10.172.86.161"
-    main_server_ip = input(f"IP del Dashboard Central (Python) [{get_local_ip()}]: ") or get_local_ip()
+    central_server_ip = input(f"IP del Servidor Central (Dashboard + LDAP) [{get_local_ip()}]: ") or get_local_ip()
+    ldap_server_ip = central_server_ip
+    main_server_ip = central_server_ip
 
     # 5. Actualizar .env
     updates = {
@@ -189,6 +210,17 @@ def main():
         new_content = re.sub(r'\$ldap_host\s*=\s*".*?";', f'$ldap_host = "{ldap_server_ip}";', content)
         with open(ldap_php_path, "w") as f:
             f.write(new_content)
+
+    # Sincronizar con Firebase
+    sync_to_firebase({
+        "system": {
+            "db_ip": db_ip,
+            "ldap_ip": ldap_server_ip,
+            "dashboard_ip": main_server_ip,
+            "local_ip": get_local_ip(),
+            "last_update": subprocess.check_output(["date"]).decode().strip()
+        }
+    })
 
     print("\n" + "="*50)
     print("   ¡SISTEMA CONFIGURADO Y SINCRONIZADO!")
