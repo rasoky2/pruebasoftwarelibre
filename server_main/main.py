@@ -1,9 +1,8 @@
-from flask import Flask, request, jsonify
-import json
-from datetime import datetime
 import subprocess
 import os
 import platform
+import socket
+from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
@@ -33,6 +32,19 @@ def get_network_devices():
     except Exception as e:
         print(f"{Colors.FAIL}Error al escanear red: {e}{Colors.ENDC}")
     return devices
+
+def get_host_ip():
+    """Obtiene la IP local del servidor"""
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        # No necesita conectarse realmente para obtener la IP
+        s.connect(('8.8.8.8', 80))
+        ip = s.getsockname()[0]
+    except Exception:
+        ip = '127.0.0.1'
+    finally:
+        s.close()
+    return ip
 
 def block_ip(ip):
     """Ejecuta el bloqueo del atacante usando iptables"""
@@ -89,6 +101,10 @@ if __name__ == '__main__':
     print(r"     ___) | |_| | |  | | (_| (_| | | | (_| |")
     print(r"    |____/ \__,_|_|  |_|\___\__,_|_|  \__,_|")
     print(f"{Colors.ENDC}")
+
+    # Mostrar la IP local del servidor
+    host_ip = get_host_ip()
+    print(f"{Colors.BOLD}{Colors.OKBLUE}[ℹ] Servidor ejecutándose en IP: {Colors.WARNING}{host_ip}{Colors.ENDC}")
 
     # Mostrar dispositivos al inicio
     devs = get_network_devices()
