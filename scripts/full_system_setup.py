@@ -70,8 +70,41 @@ def configure_netplan():
         print("[OK] Red configurada.")
         if os.path.exists("temp_netplan.yaml"): os.remove("temp_netplan.yaml")
     except Exception as e: print(f"[!] Error en Netplan: {e}")
+def run_diagnostics(ips):
+    print("\n" + "-"*30)
+    print("   DIAGNÓSTICO DE CONEXIÓN")
+    print("-"*30)
+    
+    for name, ip in ips.items():
+        if not ip or ip == "127.0.0.1":
+            continue
+            
+        print(f"[*] Probando {name} ({ip})... ", end="", flush=True)
+        try:
+            # Usar comando ping (1 paquete, wait 2s)
+            param = "-n" if platform.system().lower() == "windows" else "-c"
+            command = ["ping", param, "1", "-W", "2", ip]
+            result = subprocess.run(command, capture_output=True, text=True)
+            
+            if result.returncode == 0:
+                print(f"{Colors.OKGREEN}[CONECTADO]{Colors.ENDC}")
+            else:
+                print(f"{Colors.FAIL}[SIN RESPUESTA]{Colors.ENDC}")
+        except Exception:
+            print(f"{Colors.FAIL}[ERROR AL PROBAR]{Colors.ENDC}")
+    print("-"*30 + "\n")
+
+import platform
+
+class Colors:
+    OKGREEN = '\033[92m'
+    FAIL = '\033[91m'
+    WARNING = '\033[93m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+
 def main():
-    if os.geteuid() != 0:
+    if os.getuid() != 0:
         print("[!] Este script requiere privilegios de superusuario (sudo).")
         sys.exit(1)
 
@@ -79,37 +112,54 @@ def main():
     print("   MASTER SETUP: INFRAESTRUCTURA Y SEGURIDAD")
     print("="*50)
 
-    # 1. Internet Check
+    # 1. Internet Check inicial
     check_internet()
 
     # 2. Netplan
     conf_net = input("\n¿Desea configurar la IP estática (Netplan)? (s/N): ").lower()
     if conf_net == 's':
         configure_netplan()
+        print("\n[*] Re-verificando internet tras cambio de red...")
+        check_internet()
 
     # 3. LDAP Install
     conf_ldap_inst = input("\n¿Desea instalar la extensión LDAP de PHP? (s/N): ").lower()
     if conf_ldap_inst == 's':
         install_php_ldap()
 
-    # 4. Infraestructura
-    print("\n--- Configuración de Servicios ---")
+    # 4. Infraestructura e IPs
+    print("\n--- Configuración de Roles y Servicios ---")
     local_ip = get_local_ip()
-    db_ip = input("IP de la Base de Datos [127.0.0.1]: ") or "127.0.0.1"
-    db_user = "webuser"
-    db_pass = "web123"
     
-    central_server_ip = input(f"IP del Servidor Central (Dashboard + LDAP) [{local_ip}]: ") or local_ip
-    ldap_server_ip = central_server_ip
-    main_server_ip = central_server_ip
+    is_admin = input("¿Es esta máquina el Servidor LDAP (Admin)? (S/n): ").lower() != 'n'
+    
+    if is_admin:
+        print("[*] Configurando como Servidor LDAP (Admin).")
+        ldap_server_ip = local_ip
+    else:
+        ldap_server_ip = input("IP del Servidor LDAP Admin: ")
+        if not ldap_server_ip:
+            ldap_server_ip = "127.0.0.1"
+            print("[!] No se ingresó IP, usando 127.0.0.1 por defecto.")
 
-    # 5. Actualizar config.php
+    db_ip = input("IP de la Base de Datos [127.0.0.1]: ") or "127.0.0.1"
+    central_server_ip = input(f"IP del Dashboard (Servidor Central) [{ldap_server_ip}]: ") or ldap_server_ip
+    
+    # 5. Diagnóstico Voluntario
+    if input("\n¿Desea realizar un diagnóstico de conexión con los servidores? (s/N): ").lower() == 's':
+        run_diagnostics({
+            "Servidor LDAP (Admin)": ldap_server_ip,
+            "Base de Datos": db_ip,
+            "Dashboard": central_server_ip
+        })
+
+    # 6. Actualizar config.php
     updates = {
         "DB_HOST": db_ip,
         "DB_NAME": "lab_vulnerable",
-        "DB_USER": db_user,
-        "DB_PASS": db_pass,
-        "MAIN_SERVER_IP": main_server_ip,
+        "DB_USER": "webuser",
+        "DB_PASS": "web123",
+        "MAIN_SERVER_IP": central_server_ip,
         "LDAP_HOST": ldap_server_ip,
         "SURICATA_SENSOR_IP": local_ip
     }
@@ -117,7 +167,7 @@ def main():
     from setup_inventory import update_config_php
     update_config_php(updates)
 
-    # 6. Actualizar auth_ldap.php
+    # 7. Actualizar auth_ldap.php
     ldap_php_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "vulnerable_app", "auth_ldap.php"))
     if os.path.exists(ldap_php_path):
         print(f"[*] Sincronizando IP LDAP en auth_ldap.php...")
@@ -127,7 +177,7 @@ def main():
         with open(ldap_php_path, "w") as f:
             f.write(new_content)
 
-    # Limpieza final: Borrar .env y configuration.json si existen
+    # Limpieza final
     for file_to_del in ["../.env", "configuration.json"]:
         path_del = os.path.abspath(os.path.join(os.path.dirname(__file__), file_to_del))
         if os.path.exists(path_del):

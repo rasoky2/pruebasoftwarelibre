@@ -68,13 +68,6 @@ def setup_nginx():
     listen 80;
     server_name {server_name};
 
-    # Configuración de Error 502 Persoalizado
-    error_page 502 /error_502.html;
-    location = /error_502.html {{
-        root {os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "vulnerable_app"))};
-        internal;
-    }}
-
     location / {{
         proxy_pass http://{backend_ip}:{backend_port};
         proxy_set_header Host $host;
