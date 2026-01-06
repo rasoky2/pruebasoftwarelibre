@@ -5,7 +5,7 @@ def setup_db_config():
     print("   DB CONFIGURATOR (MySQL)")
     print("="*45)
     
-    db_host = input("IP del Servidor MySQL (ej. 192.168.1.57): ")
+    db_host = input("IP del Servidor MySQL (ej. 10.172.86.69): ")
     db_name = input("Nombre de la Base de Datos [lab_vulnerable]: ") or "lab_vulnerable"
     db_user = input("Usuario MySQL [webuser]: ") or "webuser"
     db_pass = input("Contraseña MySQL [web123]: ") or "web123"

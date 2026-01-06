@@ -23,7 +23,7 @@ def setup_inventory():
 
     # 2. Configuración de Base de Datos
     print("\n[ DATOS DE MYSQL ]")
-    db_host = input(f"IP Servidor MySQL [192.168.1.57]: ") or "192.168.1.57"
+    db_host = input(f"IP Servidor MySQL [10.172.86.69]: ") or "10.172.86.69"
     db_user = input(f"Usuario MySQL [webuser]: ") or "webuser"
     db_pass = input("Contraseña de MySQL [web123]: ") or "web123"
 
