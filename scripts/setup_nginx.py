@@ -42,9 +42,12 @@ def setup_nginx():
     listen 80;
     server_name {server_name};
 
-    # Configuración de Logs para Suricata
-    access_log /var/log/nginx/access.log;
-    error_log /var/log/nginx/error.log;
+    # Configuración de Error 502 Persoalizado
+    error_page 502 /error_502.html;
+    location = /error_502.html {{
+        root {os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "vulnerable_app"))};
+        internal;
+    }}
 
     location / {{
         proxy_pass http://{backend_ip}:{backend_port};
@@ -53,8 +56,8 @@ def setup_nginx():
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
         
-        # Timeout para apps vulnerables lentas
-        proxy_read_timeout 90;
+        # Manejar fallos del backend
+        proxy_intercept_errors on;
     }}
 }}
 """
