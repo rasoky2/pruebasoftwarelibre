@@ -16,7 +16,7 @@ if (!isset($_SESSION['user'])) {
 $search = isset($_GET['q']) ? $_GET['q'] : '';
 
 // Intentar conexión con las credenciales que config.php nos entregó
-$conn = new mysqli($DB_HOST, $DB_USER, $DB_PASS, $DB_NAME, $DB_PORT);
+$conn = new mysqli($DB_HOST, $DB_USER, $DB_PASS, $DB_NAME);
 
 if ($conn->connect_error) {
     if (!isset($is_authorized) || !$is_authorized) {

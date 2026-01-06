@@ -167,13 +167,17 @@ def setup_nginx():
             configure_suricata(main_server_ip)
             
             print(f"[*] Sincronizando IP del Dashboard en config.php...")
-            from setup_inventory import update_config_php
+            from setup_inventory import update_config_php, update_env
             update_config_php({
                 "MAIN_SERVER_IP": main_server_ip,
                 "MAIN_SERVER_PORT": "5000",
                 "SURICATA_SENSOR_IP": local_ip
             })
-            print(f"[OK] Shipper configurado para enviar a http://{main_server_ip}:5000")
+            update_env({
+                "ADMIN_IP": main_server_ip,
+                "NGINX_IP": local_ip
+            })
+            print(f"[OK] Shipper y .env configurados.")
 
         # 4. Actualización opcional de DB (config.php)
         if input("\n¿Desea actualizar la IP y credenciales de la Base de Datos en config.php? (s/N): ").lower() == 's':
@@ -191,14 +195,20 @@ def setup_nginx():
             db_user = input("Usuario MySQL [webuser]: ") or "webuser"
             db_pass = input("Contraseña MySQL [web123]: ") or "web123"
             
-            from setup_inventory import update_config_php
+            from setup_inventory import update_config_php, update_env
             update_config_php({
                 "DB_HOST": db_host,
                 "DB_NAME": db_name,
                 "DB_USER": db_user,
                 "DB_PASS": db_pass
             })
-            print("[OK] Configuración de Base de Datos actualizada en config.php.")
+            update_env({
+                "DB_IP": db_host,
+                "DB_NAME": db_name,
+                "DB_USER": db_user,
+                "DB_PASS": db_pass
+            })
+            print("[OK] Configuración de Base de Datos actualizada en config.php y .env.")
         
         run_system_diagnostics(backend_ip, backend_port)
 

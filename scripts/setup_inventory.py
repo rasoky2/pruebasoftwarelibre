@@ -33,6 +33,27 @@ def update_config_php(updates):
         f.write(content)
     print(f"[+] config.php actualizado.")
 
+def update_env(updates):
+    env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
+    env_data = {}
+    
+    # Cargar datos actuales si existe
+    if os.path.exists(env_path):
+        with open(env_path, "r") as f:
+            for line in f:
+                if "=" in line and not line.startswith("#"):
+                    k, v = line.strip().split("=", 1)
+                    env_data[k] = v
+    
+    # Aplicar actualizaciones
+    env_data.update(updates)
+    
+    # Guardar de nuevo
+    with open(env_path, "w") as f:
+        for k, v in env_data.items():
+            f.write(f"{k}={v}\n")
+    print(f"[+] Archivo .env actualizado.")
+
 def setup_inventory():
     print("\n" + "="*50)
     print("   CONFIGURADOR GLOBAL DE INFRAESTRUCTURA")
