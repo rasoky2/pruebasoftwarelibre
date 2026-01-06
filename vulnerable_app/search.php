@@ -27,13 +27,13 @@ if ($conn->connect_error) {
                 <a href='index.php' style='display:inline-block; margin-top:1rem; padding:0.5rem 1rem; background:#991b1b; color:white; border-radius:0.5rem; text-decoration:none;'>Volver al Login</a>
              </div>");
     }
-    die("❌ Error de Conexión: " . $conn->connect_error);
 }
 
 // Lógica de búsqueda VULNERABLE (SQL Injection intencional para el lab)
 $sql = "SELECT * FROM products WHERE name LIKE '%$search%' OR description LIKE '%$search%'";
 $result = $conn->query($sql);
 
+// No cerramos PHP aquí para que las variables existan abajo
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -122,7 +122,7 @@ $result = $conn->query($sql);
                         </div>
                         <div class="mt-auto pt-4 flex items-center justify-between">
                             <span class="text-xs font-bold text-blue-600 uppercase tracking-widest">En Stock</span>
-                            <span class="text-sm font-bold text-slate-900">$<?php echo $row['price'] ?? '0.00'; ?></span>
+                            <span class="text-sm font-bold text-slate-900">$<?php echo isset($row['price']) ? $row['price'] : '0.00'; ?></span>
                         </div>
                     </div>
                     <?php
@@ -144,7 +144,9 @@ $result = $conn->query($sql);
         <!-- Debug Info (Opcional para el lab) -->
         <div class="mt-20 pt-10 border-t border-dashed border-slate-200">
             <p class="text-[10px] text-slate-300 font-mono italic">Lab Debug: Vulnerable Query</p>
-            <p class="text-[10px] text-slate-400 font-mono bg-slate-50 p-2 mt-1 rounded border border-slate-100"><?php echo $sql; ?></p>
+            <p class="text-[10px] text-slate-400 font-mono bg-slate-50 p-2 mt-1 rounded border border-slate-100">
+                <?php echo isset($sql) ? $sql : 'No query generated'; ?>
+            </p>
         </div>
     </main>
 
@@ -154,5 +156,7 @@ $result = $conn->query($sql);
 </body>
 </html>
 <?php 
-$conn->close();
+if (isset($conn) && $conn) {
+    $conn->close();
+}
 ?>

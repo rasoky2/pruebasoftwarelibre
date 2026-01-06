@@ -1,8 +1,9 @@
 <?php
 /**
  * config.php - Configuración centralizada
- * Carga valores desde el archivo .env en la raíz del proyecto
  */
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
 
 function loadEnv($path) {
     if(!file_exists($path)) return;
