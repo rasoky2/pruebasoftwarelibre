@@ -14,12 +14,27 @@ def get_firebase_config():
 def sync_to_firebase(data):
     config = get_firebase_config()
     if not config: return
-    url = f"{config['databaseURL']}/infrastructure.json"
+    project_id = config['projectId']
+    # Firestore REST URL para el documento 'config/infrastructure'
+    url = f"https://firestore.googleapis.com/v1/projects/{project_id}/databases/(default)/documents/config/infrastructure"
+    
+    # Preparar campos para Firestore (formato campos: { "key": { "stringValue": "val" } })
+    fields = {}
+    for key, value in data.items():
+        if isinstance(value, dict):
+            # Aplanar diccionarios anidados para Firestore simplificado
+            for sub_key, sub_val in value.items():
+                fields[f"{key}_{sub_key}"] = {"stringValue": str(sub_val)}
+        else:
+            fields[key] = {"stringValue": str(value)}
+            
     try:
-        requests.patch(url, json=data)
-        print("[OK] Sincronizado con Firebase.")
+        # Usamos PATCH con query string para actualizar o crear campos específicos
+        params = {"updateMask.fieldPaths": list(fields.keys())}
+        requests.patch(url, json={"fields": fields}, params=params)
+        print("[OK] Sincronizado con Firestore (Nube).")
     except Exception:
-        print("[!] Fallo al conectar con Firebase.")
+        print("[!] Error: No se pudo conectar a Firestore.")
 
 def get_local_ip():
     try:

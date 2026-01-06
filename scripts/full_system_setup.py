@@ -17,12 +17,23 @@ def get_firebase_config():
 def sync_to_firebase(data):
     config = get_firebase_config()
     if not config: return
-    url = f"{config['databaseURL']}/infrastructure.json"
+    project_id = config['projectId']
+    url = f"https://firestore.googleapis.com/v1/projects/{project_id}/databases/(default)/documents/config/infrastructure"
+    
+    fields = {}
+    for key, value in data.items():
+        if isinstance(value, dict):
+            for sub_key, sub_val in value.items():
+                fields[f"{key}_{sub_key}"] = {"stringValue": str(sub_val)}
+        else:
+            fields[key] = {"stringValue": str(value)}
+            
     try:
-        requests.patch(url, json=data)
-        print("[OK] Sincronizado con Firebase.")
+        params = {"updateMask.fieldPaths": list(fields.keys())}
+        requests.patch(url, json={"fields": fields}, params=params)
+        print("[OK] Sincronizado con Firestore (Nube).")
     except Exception:
-        print("[!] Fallo al conectar con Firebase.")
+        print("[!] Error: No se pudo conectar a Firestore.")
 
 def check_internet():
     print("[*] Verificando conexión a Internet...")

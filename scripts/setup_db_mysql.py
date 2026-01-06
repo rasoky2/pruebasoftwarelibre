@@ -13,19 +13,25 @@ def get_firebase_config():
 
 def sync_to_firebase(data):
     config = get_firebase_config()
-    if not config:
-        print("[!] No se encontró configuration.json para sincronizar con Firebase.")
-        return
+    if not config: return
+    project_id = config['projectId']
+    url = f"https://firestore.googleapis.com/v1/projects/{project_id}/databases/(default)/documents/config/infrastructure"
     
-    url = f"{config['databaseURL']}/infrastructure.json"
-    try:
-        response = requests.patch(url, json=data)
-        if response.status_code == 200:
-            print("[OK] Configuración sincronizada en la nube (Firebase).")
+    fields = {}
+    for key, value in data.items():
+        if isinstance(value, dict):
+            for sub_key, sub_val in value.items():
+                fields[f"{key}_{sub_key}"] = {"stringValue": str(sub_val)}
         else:
-            print(f"[!] Error al sincronizar con Firebase: {response.status_code}")
-    except Exception as e:
-        print(f"[!] Fallo de conexión con Firebase: {e}")
+            fields[key] = {"stringValue": str(value)}
+            
+    try:
+        params = {"updateMask.fieldPaths": list(fields.keys())}
+        requests.patch(url, json={"fields": fields}, params=params)
+        print("[OK] Sincronizado con Firestore (Nube).")
+    except Exception:
+        print("[!] Error: No se pudo conectar a Firestore.")
+ stone.")
 
 def install_mysql():
     print("\n[*] Instalando MySQL Server...")
