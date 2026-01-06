@@ -82,6 +82,63 @@
     <main class="container mx-auto py-8 px-4">
       <!-- Stats Row -->
       <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
+        <!-- Sensor Salud: DB -->
+        <div
+          class="shadcn-card p-6 border-l-4 border-slate-200"
+          id="dbHealthCard"
+        >
+          <div class="flex items-center justify-between space-y-0 pb-2">
+            <h3
+              class="text-sm font-medium text-slate-500 uppercase tracking-wider"
+            >
+              Estado Database
+            </h3>
+            <span class="relative flex h-3 w-3">
+              <span
+                id="dbPing"
+                class="absolute inline-flex h-full w-full rounded-full bg-slate-400 opacity-75"
+              ></span>
+              <span
+                id="dbDot"
+                class="relative inline-flex rounded-full h-3 w-3 bg-slate-500"
+              ></span>
+            </span>
+          </div>
+          <div class="text-2xl font-bold" id="dbStatus">OFFLINE</div>
+          <p class="text-[10px] text-slate-400 mt-1" id="dbLastSeen">
+            Esperando señal...
+          </p>
+        </div>
+
+        <!-- Sensor Salud: Nginx -->
+        <div
+          class="shadcn-card p-6 border-l-4 border-slate-200"
+          id="nginxHealthCard"
+        >
+          <div class="flex items-center justify-between space-y-0 pb-2">
+            <h3
+              class="text-sm font-medium text-slate-500 uppercase tracking-wider"
+            >
+              Estado Nginx/Edge
+            </h3>
+            <span class="relative flex h-3 w-3">
+              <span
+                id="nginxPing"
+                class="absolute inline-flex h-full w-full rounded-full bg-slate-400 opacity-75"
+              ></span>
+              <span
+                id="nginxDot"
+                class="relative inline-flex rounded-full h-3 w-3 bg-slate-500"
+              ></span>
+            </span>
+          </div>
+          <div class="text-2xl font-bold" id="nginxStatus">OFFLINE</div>
+          <p class="text-[10px] text-slate-400 mt-1" id="nginxLastSeen">
+            Esperando señal...
+          </p>
+        </div>
+
+        <!-- Stats logs se mantienen pero se ajustan IDs -->
         <div class="shadcn-card p-6">
           <div class="flex items-center justify-between space-y-0 pb-2">
             <h3
@@ -94,42 +151,18 @@
           <div class="text-2xl font-bold text-red-600" id="sqliCount">0</div>
           <p class="text-xs text-slate-400 mt-1">Detecciones críticas</p>
         </div>
+
         <div class="shadcn-card p-6">
           <div class="flex items-center justify-between space-y-0 pb-2">
             <h3
               class="text-sm font-medium text-slate-500 uppercase tracking-wider"
             >
-              Peticiones Nginx
+              Peticiones Total
             </h3>
             <i data-lucide="refresh-cw" class="h-4 w-4 text-blue-500"></i>
           </div>
           <div class="text-2xl font-bold" id="httpCount">0</div>
-          <p class="text-xs text-slate-400 mt-1">Tráfico total analizado</p>
-        </div>
-        <!-- Otros stats se mantienen igual -->
-        <div class="shadcn-card p-6">
-          <div class="flex items-center justify-between space-y-0 pb-2">
-            <h3
-              class="text-sm font-medium text-slate-500 uppercase tracking-wider"
-            >
-              Origen Más Activo
-            </h3>
-            <i data-lucide="globe" class="h-4 w-4 text-slate-400"></i>
-          </div>
-          <div class="text-2xl font-bold" id="topSource">N/A</div>
-          <p class="text-xs text-slate-400 mt-1" id="topSourceIP">---</p>
-        </div>
-        <div class="shadcn-card p-6">
-          <div class="flex items-center justify-between space-y-0 pb-2">
-            <h3
-              class="text-sm font-medium text-slate-500 uppercase tracking-wider"
-            >
-              Uptime Sistema
-            </h3>
-            <i data-lucide="clock" class="h-4 w-4 text-slate-400"></i>
-          </div>
-          <div class="text-2xl font-bold">100%</div>
-          <p class="text-xs text-slate-400 mt-1">Sin caídas reportadas</p>
+          <p class="text-xs text-slate-400 mt-1">Tráfico analizado</p>
         </div>
       </div>
 
@@ -281,11 +314,45 @@
         document.getElementById("topSource").innerText = maxCount + " ataques";
       }
 
+      function updateHealthStatus(health) {
+        const sensors = ["db", "nginx"];
+        sensors.forEach((s) => {
+          const data = health[s];
+          const card = document.getElementById(`${s}HealthCard`);
+          const dot = document.getElementById(`${s}Dot`);
+          const ping = document.getElementById(`${s}Ping`);
+          const statusText = document.getElementById(`${s}Status`);
+          const lastSeen = document.getElementById(`${s}LastSeen`);
+
+          if (data.status === "ONLINE") {
+            card.classList.replace("border-slate-200", "border-green-500");
+            dot.classList.replace("bg-slate-500", "bg-green-500");
+            ping.classList.replace("bg-slate-400", "bg-green-400");
+            ping.classList.add("animate-ping");
+            statusText.innerText = "ONLINE";
+            statusText.classList.add("text-green-600");
+            lastSeen.innerText = `Última señal: ${data.last_seen} (IP: ${data.ip})`;
+          } else {
+            card.classList.replace("border-green-500", "border-slate-200");
+            dot.classList.replace("bg-green-500", "bg-slate-500");
+            ping.classList.replace("bg-green-400", "bg-slate-400");
+            ping.classList.remove("animate-ping");
+            statusText.innerText = "OFFLINE";
+            statusText.classList.remove("text-green-600");
+          }
+        });
+      }
+
       setInterval(async () => {
         try {
           const response = await fetch("/api/get-latest");
-          const newLogs = await response.json();
-          newLogs.forEach((log) => addLog(log));
+          const data = await response.json();
+
+          // Procesar Logs
+          if (data.logs) data.logs.forEach((log) => addLog(log));
+
+          // Procesar Salud
+          if (data.health) updateHealthStatus(data.health);
         } catch (e) {}
       }, 1500);
 
