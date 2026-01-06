@@ -17,7 +17,28 @@ def get_local_ip():
     except Exception:
         return "127.0.0.1"
 
+def check_package_installed(package_name):
+    try:
+        result = subprocess.run(["dpkg", "-l", package_name], capture_output=True, text=True)
+        return result.returncode == 0
+    except Exception:
+        return False
+
+def install_nginx():
+    if check_package_installed("nginx"):
+        print("[OK] Nginx ya está instalado.")
+        return
+    print("\n[*] Instalando Nginx...")
+    try:
+        subprocess.run(["sudo", "apt", "update"], check=True)
+        subprocess.run(["sudo", "apt", "install", "-y", "nginx"], check=True)
+    except Exception as e:
+        print(f"[!] Error al instalar Nginx: {e}")
+
 def install_suricata():
+    if check_package_installed("suricata"):
+        print("[OK] Suricata ya está instalado.")
+        return
     print("\n[*] Instalando Suricata (Sistema de Detección de Intrusos)...")
     try:
         subprocess.run(["sudo", "apt", "update"], check=True)
@@ -124,6 +145,21 @@ def setup_nginx():
                 "SURICATA_SENSOR_IP": local_ip
             })
             print(f"[OK] Shipper configurado para enviar a http://{main_server_ip}:5000")
+
+        # 4. Actualización opcional de DB (config.php)
+        if input("\n¿Desea actualizar la IP y credenciales de la Base de Datos en config.php? (s/N): ").lower() == 's':
+            db_host = input("IP del Servidor MySQL: ")
+            db_user = input("Usuario MySQL [webuser]: ") or "webuser"
+            db_pass = input("Contraseña MySQL [web123]: ") or "web123"
+            
+            from setup_inventory import update_config_php
+            update_config_php({
+                "DB_HOST": db_host,
+                "DB_NAME": "lab_vulnerable",
+                "DB_USER": db_user,
+                "DB_PASS": db_pass
+            })
+            print("[OK] Configuración de Base de Datos actualizada en config.php.")
         
     except Exception as e:
         print(f"[!] Error: {e}")

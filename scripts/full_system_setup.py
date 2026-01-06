@@ -26,14 +26,37 @@ def get_local_ip():
         return ip
     except Exception: return "127.0.0.1"
 
+def check_package_installed(package_name):
+    try:
+        result = subprocess.run(["dpkg", "-l", package_name], capture_output=True, text=True)
+        return result.returncode == 0
+    except Exception:
+        return False
+
 def install_php_ldap():
-    print("\n[*] Instalando extensión LDAP para PHP...")
+    # Detectar versión de PHP y nombre del paquete
     try:
         result = subprocess.run(["php", "-v"], capture_output=True, text=True)
         version_match = re.search(r"PHP (\d+\.\d+)", result.stdout)
+        if not version_match:
+            print("[!] No se detectó PHP instalado.")
+            return
+        php_version = version_match.group(1)
+        pkg = f"php{php_version}-ldap"
+    except Exception:
         pkg = "php-ldap"
-        if version_match:
-            pkg = f"php{version_match.group(1)}-ldap"
+
+    # Verificar si ya está instalado
+    print(f"[*] Verificando {pkg}...")
+    try:
+        check_ext = subprocess.run(["php", "-m"], capture_output=True, text=True)
+        if "ldap" in check_ext.stdout.lower():
+            print(f"[OK] La extensión LDAP ya está instalada en PHP.")
+            return
+    except Exception: pass
+
+    print(f"\n[*] Instalando extensión LDAP para PHP ({pkg})...")
+    try:
         subprocess.run(["sudo", "apt", "update"], check=True)
         subprocess.run(["sudo", "apt", "install", "-y", pkg], check=True)
         print("[OK] LDAP instalado correctamente.")

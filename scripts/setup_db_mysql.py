@@ -15,16 +15,29 @@ def get_local_ip():
         return ip
     except Exception: return "127.0.0.1"
 
+def check_package_installed(package_name):
+    try:
+        result = subprocess.run(["dpkg", "-l", package_name], capture_output=True, text=True)
+        return result.returncode == 0
+    except Exception:
+        return False
+
 def install_mysql():
+    if check_package_installed("mysql-server"):
+        print("[OK] MySQL Server ya está instalado.")
+        return
     print("\n[*] Instalando MySQL Server...")
     try:
         subprocess.run(["sudo", "apt", "update"], check=True)
-        subprocess.run(["sudo", "apt", "install", "-y", "mysql-server"], check=True)
+        subprocess.run(["sudo", "apt", "-y", "install", "mysql-server"], check=True)
         print("[OK] MySQL Server instalado.")
     except Exception as e:
         print(f"[!] Error al instalar MySQL: {e}")
 
 def install_suricata():
+    if check_package_installed("suricata"):
+        print("[OK] Suricata ya está instalado.")
+        return
     print("\n[*] Instalando Suricata (Sistema de Detección de Intrusos)...")
     try:
         subprocess.run(["sudo", "apt", "update"], check=True)
