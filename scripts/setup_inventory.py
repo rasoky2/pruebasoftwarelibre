@@ -24,7 +24,8 @@ def setup_inventory():
     # 2. Configuración de Base de Datos
     print("\n[ DATOS DE MYSQL ]")
     db_host = input(f"IP Servidor MySQL [192.168.1.57]: ") or "192.168.1.57"
-    db_pass = input("Contraseña del usuario root de MySQL: ")
+    db_user = input(f"Usuario MySQL [webuser]: ") or "webuser"
+    db_pass = input("Contraseña de MySQL [web123]: ") or "web123"
 
     # 3. Configuración de LDAP (Agustín)
     print("\n[ DATOS DE LDAP (AGUSTÍN) ]")
@@ -44,6 +45,7 @@ def setup_inventory():
         with open(env_path, "w") as f:
             for line in lines:
                 if line.startswith("DB_HOST="): f.write(f"DB_HOST={db_host}\n")
+                elif line.startswith("DB_USER="): f.write(f"DB_USER={db_user}\n")
                 elif line.startswith("DB_PASS="): f.write(f"DB_PASS={db_pass}\n")
                 elif line.startswith("MAIN_SERVER_IP="): f.write(f"MAIN_SERVER_IP={main_ip}\n")
                 elif line.startswith("SURICATA_SENSOR_IP="): f.write(f"SURICATA_SENSOR_IP={local_ip}\n")

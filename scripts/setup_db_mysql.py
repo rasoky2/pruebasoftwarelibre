@@ -7,8 +7,8 @@ def setup_db_config():
     
     db_host = input("IP del Servidor MySQL (ej. 192.168.1.57): ")
     db_name = input("Nombre de la Base de Datos [lab_vulnerable]: ") or "lab_vulnerable"
-    db_user = input("Usuario MySQL [root]: ") or "root"
-    db_pass = input("Contraseña MySQL: ")
+    db_user = input("Usuario MySQL [webuser]: ") or "webuser"
+    db_pass = input("Contraseña MySQL [web123]: ") or "web123"
 
     env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
     

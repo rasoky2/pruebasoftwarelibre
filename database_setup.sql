@@ -31,7 +31,7 @@ INSERT INTO products (name, description) VALUES
 ('Teclado Mecánico', 'Teclado con switches Blue y retroiluminación RGB.'),
 ('Monitor 4K', 'Monitor Ultra HD para diseño gráfico.');
 
--- Crear un usuario específico para la aplicación (Opcional pero recomendado)
--- CREATE USER 'app_user'@'%' IDENTIFIED BY 'password123';
--- GRANT ALL PRIVILEGES ON lab_vulnerable.* TO 'app_user'@'%';
--- FLUSH PRIVILEGES;
+-- Crear un usuario específico para la aplicación
+CREATE USER IF NOT EXISTS 'webuser'@'%' IDENTIFIED BY 'web123';
+GRANT ALL PRIVILEGES ON lab_vulnerable.* TO 'webuser'@'%';
+FLUSH PRIVILEGES;
