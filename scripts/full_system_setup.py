@@ -74,11 +74,36 @@ def install_php_ldap():
     except Exception as e:
         print(f"[!] Error al instalar LDAP: {e}")
 
+def get_default_gateway():
+    try:
+        # Ejecutar 'ip route' para encontrar la ruta predeterminada
+        result = subprocess.run(["ip", "route"], capture_output=True, text=True)
+        for line in result.stdout.splitlines():
+            if "default via" in line:
+                return line.split()[2]
+    except:
+        pass
+    return "10.172.86.1" # Fallback común en tu red
+
 def configure_netplan():
     print("\n--- Configuración de Red (Netplan) ---")
-    interface = input("Interfaz de red (ej. ens33, eth0): ")
-    new_ip = input("Ingrese IP estática con CIDR (ej. 10.172.86.110/24): ")
-    gateway = input("Gateway (ej. 10.172.86.1): ")
+    
+    # Detectar Interfaz automáticamente
+    try:
+        interface = subprocess.check_output("ip -o link show | awk -F': ' '{print $2}' | grep -v 'lo' | head -n1", shell=True).decode().strip()
+    except:
+        interface = "ens33"
+
+    gateway = get_default_gateway()
+    local_ip = get_local_ip()
+    suggested_ip = f"{local_ip}/24"
+
+    print(f"[*] Interfaz detectada: {interface}")
+    print(f"[*] Gateway detectado: {gateway}")
+    
+    interface = input(f"Interfaz de red [{interface}]: ") or interface
+    new_ip = input(f"Ingrese IP estática con CIDR [{suggested_ip}]: ") or suggested_ip
+    gateway = input(f"Gateway (Puerto de Enlace) [{gateway}]: ") or gateway
     dns = input("DNS [8.8.8.8, 1.1.1.1]: ") or "8.8.8.8, 1.1.1.1"
 
     config = {
