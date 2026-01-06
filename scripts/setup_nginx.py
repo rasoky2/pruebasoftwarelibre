@@ -21,8 +21,17 @@ def setup_nginx():
     print("   AUTOMATIC NGINX PROXY SETUP")
     print("="*45)
     
+    print("\n--- Seleccione el Rol de este Servidor ---")
+    print("1) Nodo Borde (Nginx + Suricata)")
+    print("2) Servidor de Base de Datos (MySQL)")
+    role_choice = input("Seleccione una opción [1]: ") or "1"
+    
+    if role_choice != "1":
+        print("[!] Cancelado: Nginx no debe instalarse en el servidor de Base de Datos.")
+        sys.exit(0)
+
     local_ip = get_local_ip()
-    print(f"[*] IP detectada en este equipo: {local_ip}")
+    print(f"[*] IP detectada en equipo Nginx: {local_ip}")
     
     backend_ip = input("Ingrese IP del Servidor PHP (Backend) [127.0.0.1]: ") or "127.0.0.1"
     backend_port = input("Ingrese Puerto del Backend [8000]: ") or "8000"

@@ -19,22 +19,31 @@ def setup_suricata():
     print("   AUTOMATIC SURICATA CONFIGURATOR")
     print("="*45)
     
-    # 1. Detección automática de IP
+    # 1. Identificar Rol del Servidor
+    print("\n--- Seleccione el Rol de este Servidor ---")
+    print("1) Nodo Borde (Nginx + Suricata)")
+    print("2) Servidor de Base de Datos (MySQL)")
+    role_choice = input("Seleccione una opción [1]: ") or "1"
+    
+    role_name = "Nginx/Edge" if role_choice == "1" else "Database"
+    print(f"[*] Configurando como: {role_name}")
+
+    # 2. Detección automática de IP
     detected_ip = get_local_ip()
-    print(f"[*] IP detectada en este equipo: {detected_ip}")
-    use_detected = input(f"¿Desea usar esta IP para el sensor? (S/n): ").lower()
+    print(f"[*] IP detectada en equipo {role_name}: {detected_ip}")
+    use_detected = input(f"¿Usar esta IP? (S/n): ").lower()
     
     if use_detected == '' or use_detected == 's':
         local_ip = detected_ip
     else:
-        local_ip = input("Ingrese la IP manual del sensor: ")
+        local_ip = input(f"Ingrese la IP manual para {role_name}: ")
 
     main_server_ip = input("Ingrese la IP del Servidor Main (Dashboard): ")
     
-    # 2. Actualizar el archivo .env (Subiendo un nivel desde scripts/)
+    # 3. Actualizar el archivo .env
     env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
     if os.path.exists(env_path):
-        print(f"[*] Actualizando variables en {env_path}...")
+        print(f"[*] Actualizando variables en .env...")
         with open(env_path, "r") as f:
             lines = f.readlines()
         
@@ -42,8 +51,10 @@ def setup_suricata():
             for line in lines:
                 if line.startswith("MAIN_SERVER_IP="):
                     f.write(f"MAIN_SERVER_IP={main_server_ip}\n")
-                elif line.startswith("SURICATA_SENSOR_IP="):
+                elif line.startswith("SURICATA_SENSOR_IP=") and role_choice == "1":
                     f.write(f"SURICATA_SENSOR_IP={local_ip}\n")
+                elif line.startswith("DB_HOST=") and role_choice == "2":
+                    f.write(f"DB_HOST={local_ip}\n")
                 else:
                     f.write(line)
     
