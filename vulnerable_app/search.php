@@ -6,16 +6,34 @@ require_once 'config.php';
 
 $search = isset($_GET['q']) ? $_GET['q'] : '';
 
-// Conexión a la base de datos
-try {
-    $conn = new mysqli($DB_HOST, $DB_USER, $DB_PASS, $DB_NAME);
-    if ($conn->connect_error) {
-        die("Error de conexión: " . $conn->connect_error);
-    }
-} catch (Exception $e) {
-    die("Error fatal: " . $e->getMessage());
+// Conexión a la base de datos<?php
+/**
+ * BUSCADOR PROTEGIDO CON INTERBLOQUEO LDAP-DB
+ */
+require_once 'config.php'; // Esto ya maneja la sesión y las credenciales protegidas
+
+// CORTE DE SEGURIDAD: Solo usuarios con ticket LDAP o rol básico
+if (!isset($_SESSION['user'])) {
+    die("<div style='color:red; font-family:sans-serif; padding:20px; border:1px solid red;'>
+            <h2>🚫 Acceso Denegado</h2>
+            <p>Debes iniciar sesión para acceder al buscador.</p>
+            <a href='index.php'>Ir al Login</a>
+         </div>");
 }
 
+// Intentar conexión con las credenciales que config.php nos entregó
+$conn = new mysqli($DB_HOST, $DB_USER, $DB_PASS, $DB_NAME);
+
+if ($conn->connect_error) {
+    // Asumiendo que $is_authorized se establecería en config.php o en un proceso de autenticación LDAP previo.
+    // Si no está definida, esta condición siempre será verdadera si la conexión falla.
+    // Para este ejemplo, si no hay una variable $is_authorized, se asume que no hay autorización LDAP activa.
+    if (!isset($is_authorized) || !$is_authorized) {
+        die("🔒 <b>SISTEMA BLOQUEADO:</b> No tienes autorización LDAP activa para ver la Base de Datos.");
+    }
+    die("❌ Error de Conexión: " . $conn->connect_error);
+}
+?>
 // Lógica de búsqueda VULNERABLE (SQL Injection intencional)
 $sql = "SELECT * FROM products WHERE name LIKE '%$search%' OR description LIKE '%$search%'";
 $result = $conn->query($sql);
