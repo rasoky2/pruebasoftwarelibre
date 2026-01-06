@@ -1,9 +1,6 @@
 import os
 import sys
 import subprocess
-import json
-import requests
-import re
 import socket
 
 def get_local_ip():
@@ -13,7 +10,8 @@ def get_local_ip():
         ip = s.getsockname()[0]
         s.close()
         return ip
-    except Exception: return "127.0.0.1"
+    except Exception:
+        return "127.0.0.1"
 
 def check_package_installed(package_name):
     try:
@@ -35,68 +33,27 @@ def install_mysql():
         print(f"[!] Error al instalar MySQL: {e}")
 
 def restart_mysql():
-    print(f"\n{Colors_OKBLUE}[*] Reiniciando servicio MySQL...{Colors_ENDC}")
+    print("\n[*] Reiniciando servicio MySQL...")
     try:
         subprocess.run(["sudo", "systemctl", "restart", "mysql"], check=True)
-        print(f"{Colors_OKGREEN}[OK] MySQL reiniciado correctamente.{Colors_ENDC}")
+        print("[OK] MySQL reiniciado correctamente.")
         return True
     except Exception as e:
-        print(f"{Colors_FAIL}[!] Error al reiniciar MySQL: {e}{Colors_ENDC}")
+        print(f"[!] Error al reiniciar MySQL: {e}")
         return False
 
 def check_db_health(user, password, host, database):
     """Verifica si la base de datos está activa"""
     try:
-        # Usar el comando mysql directamente para verificar conexión
         cmd = f"mysql -u{user} -p{password} -h{host} -e 'SELECT 1;' {database}"
         result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
         return result.returncode == 0
     except Exception:
         return False
 
-def install_suricata():
-    if check_package_installed("suricata"):
-        print("[OK] Suricata ya está instalado.")
-        return
-    print("\n[*] Instalando Suricata (Sistema de Detección de Intrusos)...")
-    try:
-        subprocess.run(["sudo", "apt", "update"], check=True)
-        subprocess.run(["sudo", "apt", "install", "-y", "suricata"], check=True)
-        print("[OK] Suricata instalado.")
-    except Exception as e:
-        print(f"[!] Error al instalar Suricata: {e}")
-
-def configure_suricata(main_server_ip):
-    print("[*] Configurando Suricata para monitorear esta máquina...")
-    local_ip = get_local_ip()
-    suricata_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "suricata"))
-    suricata_yaml = os.path.join(suricata_dir, "suricata.yaml")
-    local_rules = os.path.join(suricata_dir, "rules", "local.rules")
-
-    if os.path.exists(suricata_yaml):
-        with open(suricata_yaml, "r") as f: content = f.read()
-        
-        # HOME_NET y Reglas
-        content = re.sub(r'HOME_NET: "\[.*?\]"', f'HOME_NET: "[{local_ip}/32]"', content)
-        if "rule-files:" in content:
-            if "local.rules" not in content:
-                content = content.replace("rule-files:", f"rule-files:\n  - {local_rules}")
-        
-        with open(suricata_yaml, "w") as f: f.write(content)
-        print(f"[OK] Suricata configurado (HOME_NET: {local_ip})")
-    else:
-        print("[!] Advertencia: No se encontró suricata.yaml base.")
-
-# Definir colores para consistencia
-Colors_OKGREEN = '\033[92m'
-Colors_FAIL = '\033[91m'
-Colors_WARNING = '\033[93m'
-Colors_OKBLUE = '\033[94m'
-Colors_ENDC = '\033[0m'
-
 def setup_db_config():
     print("\n" + "="*50)
-    print("   DB & SECURITY SETUP (MySQL + Suricata)")
+    print("   DB & SECURITY SETUP (MySQL)")
     print("="*50)
     
     # 1. MySQL
@@ -112,48 +69,42 @@ def setup_db_config():
     if db_host in ["127.0.0.1", "localhost", local_ip]:
         sql_cmd = f"CREATE DATABASE IF NOT EXISTS {db_name}; " \
                   f"CREATE USER IF NOT EXISTS '{db_user}'@'%' IDENTIFIED BY '{db_pass}'; " \
+                  f"CREATE USER IF NOT EXISTS '{db_user}'@'localhost' IDENTIFIED BY '{db_pass}'; " \
+                  f"CREATE USER IF NOT EXISTS '{db_user}'@'127.0.0.1' IDENTIFIED BY '{db_pass}'; " \
                   f"GRANT ALL PRIVILEGES ON {db_name}.* TO '{db_user}'@'%'; " \
+                  f"GRANT ALL PRIVILEGES ON {db_name}.* TO '{db_user}'@'localhost'; " \
+                  f"GRANT ALL PRIVILEGES ON {db_name}.* TO '{db_user}'@'127.0.0.1'; " \
                   f"ALTER USER '{db_user}'@'%' IDENTIFIED WITH mysql_native_password BY '{db_pass}'; " \
                   f"FLUSH PRIVILEGES;"
         try:
             subprocess.run(["sudo", "mysql", "-e", sql_cmd], check=True)
-            print(f"{Colors_OKGREEN}[OK] DB local configurada con soporte para Interbloqueo LDAP.{Colors_ENDC}")
+            print("[OK] DB local configurada con soporte para Interbloqueo LDAP.")
         except Exception as e:
-            print(f"{Colors_FAIL}[!] Error configurando MySQL: {e}{Colors_ENDC}")
+            print(f"[!] Error configurando MySQL: {e}")
 
     # 2. Reiniciar MySQL para aplicar cambios
     restart_mysql()
 
-    # 3. Suricata
-    main_server_ip = input(f"IP Servidor Main (Dashboard) [{local_ip}]: ") or local_ip
-    
-    if input("¿Instalar y Configurar Suricata IDS? (s/N): ").lower() == 's':
-        install_suricata()
-        configure_suricata(main_server_ip)
-        
-        # Configurar Shipper para enviar datos al puerto 5000
-        print(f"[*] Configurando reenvío de alertas a http://{main_server_ip}:5000")
-        from setup_inventory import update_config_php
-        update_config_php({
-            "DB_HOST": db_host,
-            "DB_NAME": db_name,
-            "DB_USER": db_user,
-            "DB_PASS": db_pass,
-            "MAIN_SERVER_IP": main_server_ip,
-            "MAIN_SERVER_PORT": "5000"
-        })
+    # 3. Actualizar .env (ÚNICA FUENTE DE VERDAD)
+    from setup_inventory import update_env
+    update_env({
+        "DB_IP": db_host,
+        "DB_NAME": db_name,
+        "DB_USER": db_user,
+        "DB_PASS": db_pass
+    })
     
     # 4. Verificación Final de la Base de Datos
-    print(f"\n{Colors_OKBLUE}[*] Realizando verificación final de la base de datos...{Colors_ENDC}")
+    print("\n[*] Realizando verificación final de la base de datos...")
     is_healthy = check_db_health(db_user, db_pass, db_host, db_name)
     
     print("\n" + "="*50)
     if is_healthy:
-        print(f"{Colors_OKGREEN}   ¡CONFIGURACIÓN COMPLETADA Y VERIFICADA!{Colors_ENDC}")
-        print(f"   Estado de MySQL: ONLINE")
+        print("   ¡CONFIGURACIÓN COMPLETADA Y VERIFICADA!")
+        print("   Estado de MySQL: ONLINE")
     else:
-        print(f"{Colors_FAIL}   ¡CONFIGURACIÓN COMPLETADA CON ADVERTENCIAS!{Colors_ENDC}")
-        print(f"   Estado de MySQL: OFFLINE (Verifica credenciales o red)")
+        print("   ¡CONFIGURACIÓN COMPLETADA CON ADVERTENCIAS!")
+        print("   Estado de MySQL: OFFLINE (Verifica credenciales o red)")
     print("="*50 + "\n")
 
 if __name__ == "__main__":
