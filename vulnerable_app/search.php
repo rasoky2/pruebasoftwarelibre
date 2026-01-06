@@ -88,7 +88,7 @@ if ($search) {
                 <div class="space-y-2">
                     <p class="text-slate-500">SQLi Error-Based:</p>
                     <code class="block bg-slate-900 p-2 rounded border border-slate-800 text-green-400 break-all cursor-pointer hover:bg-slate-800" onclick="navigator.clipboard.writeText(this.innerText)">
-                        ' UNION SELECT 1,username,password FROM users--
+                        ' UNION SELECT 1,username,password FROM users#
                     </code>
                 </div>
             </div>

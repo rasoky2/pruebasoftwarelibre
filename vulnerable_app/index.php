@@ -93,8 +93,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
     <script>
         function injectSQL() {
-            // El payload ' OR 1=1 -- comenta el resto de la consulta SQL (incluyendo el AND de la contraseña)
-            document.getElementById('username').value = "' OR 1=1 --";
+            // El payload ' OR 1=1 # comenta el resto de la consulta SQL en MySQL
+            document.getElementById('username').value = "' OR 1=1 #";
             document.getElementById('password').value = "hack";
             // Resaltar para feedback visual
             document.getElementById('username').classList.add('border-blue-500');

@@ -6,10 +6,29 @@
  * Lee el archivo eve.json y envía cada alerta vía HTTP POST.
  */
 
-$suricataLogPath = __DIR__ . '/../suricata/logs/eve.json';
-$mainServerUrl = 'http://IP_DEL_SERVIDOR_MAIN/api/logs'; // Cambiar por la IP real del Main
+/**
+ * Carga variables desde un archivo .env simple
+ */
+function loadEnv($path) {
+    if (!file_exists($path)) return [];
+    $lines = file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    $env = [];
+    foreach ($lines as $line) {
+        if (strpos(trim($line), '#') === 0) continue;
+        list($name, $value) = explode('=', $line, 2);
+        $env[trim($name)] = trim($value);
+    }
+    return $env;
+}
 
-echo "Iniciando Shipper de Logs...\n";
+$env = loadEnv(__DIR__ . '/../.env');
+
+$suricataLogPath = __DIR__ . '/' . ($env['SURICATA_LOG_PATH'] ?? '../suricata/logs/eve.json');
+$mainServerIp = $env['MAIN_SERVER_IP'] ?? '127.0.0.1';
+$mainServerPort = $env['MAIN_SERVER_PORT'] ?? '5000';
+$mainServerUrl = "http://$mainServerIp:$mainServerPort";
+
+echo "Iniciando Shipper de Logs apuntando a $mainServerUrl...\n";
 
 // Abrir el archivo de logs
 $handle = fopen($suricataLogPath, 'r');
