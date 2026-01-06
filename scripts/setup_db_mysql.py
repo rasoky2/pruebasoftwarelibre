@@ -5,7 +5,6 @@ import json
 import requests
 import re
 import socket
-import threading
 
 def get_local_ip():
     try:
@@ -34,6 +33,26 @@ def install_mysql():
         print("[OK] MySQL Server instalado.")
     except Exception as e:
         print(f"[!] Error al instalar MySQL: {e}")
+
+def restart_mysql():
+    print(f"\n{Colors_OKBLUE}[*] Reiniciando servicio MySQL...{Colors_ENDC}")
+    try:
+        subprocess.run(["sudo", "systemctl", "restart", "mysql"], check=True)
+        print(f"{Colors_OKGREEN}[OK] MySQL reiniciado correctamente.{Colors_ENDC}")
+        return True
+    except Exception as e:
+        print(f"{Colors_FAIL}[!] Error al reiniciar MySQL: {e}{Colors_ENDC}")
+        return False
+
+def check_db_health(user, password, host, database):
+    """Verifica si la base de datos está activa"""
+    try:
+        # Usar el comando mysql directamente para verificar conexión
+        cmd = f"mysql -u{user} -p{password} -h{host} -e 'SELECT 1;' {database}"
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+        return result.returncode == 0
+    except Exception:
+        return False
 
 def install_suricata():
     if check_package_installed("suricata"):
@@ -68,43 +87,6 @@ def configure_suricata(main_server_ip):
     else:
         print("[!] Advertencia: No se encontró suricata.yaml base.")
 
-def check_db_health(user, password, host, database):
-    """Verifica si la base de datos está activa"""
-    try:
-        # Usar el comando mysql directamente para evitar dependencias extras de python-mysql
-        cmd = f"mysql -u{user} -p{password} -h{host} -e 'SELECT 1;' {database}"
-        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-        return result.returncode == 0
-    except:
-        return False
-
-def run_health_server(config):
-    """Inicia un servidor Flask minimalista para reportar el estado de la DB"""
-    try:
-        from flask import Flask, Response
-    except ImportError:
-        print("[*] Instalando Flask para el Health Server...")
-        subprocess.run([sys.executable, "-m", "pip", "install", "flask"], check=True)
-        from flask import Flask, Response
-
-    app = Flask(__name__)
-
-    @app.route('/')
-    def status():
-        is_healthy = check_db_health(
-            config['DB_USER'], 
-            config['DB_PASS'], 
-            config['DB_HOST'], 
-            config['DB_NAME']
-        )
-        status_text = "DATABASE STATUS: ONLINE" if is_healthy else "DATABASE STATUS: OFFLINE"
-        return Response(status_text, mimetype='text/plain')
-
-    local_ip = get_local_ip()
-    print(f"\n{Colors_OKGREEN}[*] Health Server iniciado en http://{local_ip}:5001{Colors_ENDC}")
-    print("[*] Presiona Ctrl+C para detener el monitor.")
-    app.run(host='0.0.0.0', port=5001, debug=False)
-
 # Definir colores para consistencia
 Colors_OKGREEN = '\033[92m'
 Colors_FAIL = '\033[91m'
@@ -128,19 +110,21 @@ def setup_db_config():
 
     local_ip = get_local_ip()
     if db_host in ["127.0.0.1", "localhost", local_ip]:
-        # Creamos dos niveles de acceso:
-        # 1. webuser: Usuario principal configurado en config.php
-        # 2. ldap_sync: Un marcador para saber que la DB está lista para el interbloqueo
         sql_cmd = f"CREATE DATABASE IF NOT EXISTS {db_name}; " \
                   f"CREATE USER IF NOT EXISTS '{db_user}'@'%' IDENTIFIED BY '{db_pass}'; " \
                   f"GRANT ALL PRIVILEGES ON {db_name}.* TO '{db_user}'@'%'; " \
                   f"ALTER USER '{db_user}'@'%' IDENTIFIED WITH mysql_native_password BY '{db_pass}'; " \
                   f"FLUSH PRIVILEGES;"
-        subprocess.run(["sudo", "mysql", "-e", sql_cmd], check=True)
-        print(f"{Colors_OKGREEN}[OK] DB local configurada con soporte para Interbloqueo LDAP.{Colors_ENDC}")
-        print(f"{Colors_OKBLUE}    -> Los usuarios de LDAP ahora podrán acceder a través de la web.{Colors_ENDC}")
+        try:
+            subprocess.run(["sudo", "mysql", "-e", sql_cmd], check=True)
+            print(f"{Colors_OKGREEN}[OK] DB local configurada con soporte para Interbloqueo LDAP.{Colors_ENDC}")
+        except Exception as e:
+            print(f"{Colors_FAIL}[!] Error configurando MySQL: {e}{Colors_ENDC}")
 
-    # 2. Suricata
+    # 2. Reiniciar MySQL para aplicar cambios
+    restart_mysql()
+
+    # 3. Suricata
     main_server_ip = input(f"IP Servidor Main (Dashboard) [{local_ip}]: ") or local_ip
     
     if input("¿Instalar y Configurar Suricata IDS? (s/N): ").lower() == 's':
@@ -159,19 +143,18 @@ def setup_db_config():
             "MAIN_SERVER_PORT": "5000"
         })
     
+    # 4. Verificación Final de la Base de Datos
+    print(f"\n{Colors_OKBLUE}[*] Realizando verificación final de la base de datos...{Colors_ENDC}")
+    is_healthy = check_db_health(db_user, db_pass, db_host, db_name)
+    
     print("\n" + "="*50)
-    print("   ¡CONFIGURACIÓN COMPLETADA!")
-    print("="*50)
-
-    # 3. Health Server
-    if input("\n¿Desea iniciar el Servidor de Estado (Health Server) en el puerto 5001? (s/N): ").lower() == 's':
-        config = {
-            'DB_USER': db_user,
-            'DB_PASS': db_pass,
-            'DB_HOST': db_host,
-            'DB_NAME': db_name
-        }
-        run_health_server(config)
+    if is_healthy:
+        print(f"{Colors_OKGREEN}   ¡CONFIGURACIÓN COMPLETADA Y VERIFICADA!{Colors_ENDC}")
+        print(f"   Estado de MySQL: ONLINE")
+    else:
+        print(f"{Colors_FAIL}   ¡CONFIGURACIÓN COMPLETADA CON ADVERTENCIAS!{Colors_ENDC}")
+        print(f"   Estado de MySQL: OFFLINE (Verifica credenciales o red)")
+    print("="*50 + "\n")
 
 if __name__ == "__main__":
     setup_db_config()
