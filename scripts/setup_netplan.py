@@ -1,28 +1,35 @@
 import os
-import yaml
 import sys
+import socket
+import yaml
 
-def configure_netplan():
-    print("--- Configuracion de Red (Netplan) ---")
+def get_local_ip():
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return None
+
+def setup_netplan():
+    if os.geteuid() != 0:
+        print("[!] Este script requiere sudo.")
+        sys.exit(1)
+
+    print("\n" + "="*45)
+    print("   AUTOMATIC NETPLAN CONFIGURATOR")
+    print("="*45)
     
-    # Intentar detectar archivos netplan existentes
-    netplan_dir = "/etc/netplan/"
-    if not os.path.exists(netplan_dir):
-        print(f"Error: No se encontro el directorio {netplan_dir}. ¿Estas en Ubuntu/Debian?")
-        return
-
-    files = [f for f in os.listdir(netplan_dir) if f.endswith(".yaml")]
-    if not files:
-        target_file = os.path.join(netplan_dir, "01-netcfg.yaml")
-    else:
-        target_file = os.path.join(netplan_dir, files[0])
-
-    print(f"Archivo de destino: {target_file}")
+    current_ip = get_local_ip()
+    if current_ip:
+        print(f"[*] IP actual del sistema: {current_ip}")
     
-    interface = input("Ingrese el nombre de la interfaz (ej. eth0, ens33): ")
-    ip_address = input("Ingrese la IP estatica con mascara (ej. 192.168.1.56/24): ")
-    gateway = input("Ingrese la IP del Gateway (ej. 192.168.1.1): ")
-    dns = input("Ingrese servidores DNS (separados por coma, ej. 8.8.8.8, 1.1.1.1): ").split(",")
+    interface = input("Interfaz de red (ej. ens33, eth0): ")
+    new_ip = input(f"Nueva IP estática con CIDR (ej. {current_ip or '192.168.1.56'}/24): ")
+    gateway = input("Gateway (ej. 192.168.1.1): ")
+    dns = input("DNS (comas para varios) [8.8.8.8, 1.1.1.1]: ") or "8.8.8.8, 1.1.1.1"
 
     config = {
         "network": {
@@ -30,41 +37,34 @@ def configure_netplan():
             "renderer": "networkd",
             "ethernets": {
                 interface: {
-                    "addresses": [ip_address],
-                    "routes": [
-                        {"to": "default", "via": gateway}
-                    ],
-                    "nameservers": {
-                        "addresses": [d.strip() for d in dns]
-                    }
+                    "addresses": [new_ip],
+                    "routes": [{"to": "default", "via": gateway}],
+                    "nameservers": {"addresses": [d.strip() for d in dns.split(",")]}
                 }
             }
         }
     }
 
+    netplan_dir = "/etc/netplan/"
+    # Tomar el primer archivo yaml o crear uno nuevo
+    yamls = [f for f in os.listdir(netplan_dir) if f.endswith(".yaml")]
+    target_file = os.path.join(netplan_dir, yamls[0] if yamls else "01-netcfg.yaml")
+
+    print(f"[*] Guardando cambios en {target_file}...")
+    
     try:
-        with open("temp_netplan.yaml", "w") as f:
+        with open("netplan_temp.yaml", "w") as f:
             yaml.dump(config, f, default_flow_style=False)
         
-        print("\nConfiguracion generada exitosamente.")
-        print("-" * 30)
-        with open("temp_netplan.yaml", "r") as f:
-            print(f.read())
-        print("-" * 30)
-
-        confirm = input(f"¿Desea aplicar esta configuracion en {target_file}? (s/n): ")
-        if confirm.lower() == 's':
-            os.system(f"sudo cp temp_netplan.yaml {target_file}")
-            os.system("sudo netplan apply")
-            print("Configuracion aplicada. La conexion podria reiniciarse.")
-        else:
-            print("Operacion cancelada. El archivo temporal es 'temp_netplan.yaml'.")
-
+        os.system(f"cp netplan_temp.yaml {target_file}")
+        print("[*] Aplicando cambios (esto podría desconectar su sesión SSH)...")
+        os.system("netplan apply")
+        print("[+] RED CONFIGURADA EXITOSAMENTE")
+        os.remove("netplan_temp.yaml")
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"[!] Error: {e}")
+    
+    print("="*45 + "\n")
 
 if __name__ == "__main__":
-    if os.geteuid() != 0:
-        print("Este script debe ejecutarse con privilegios de superusuario (sudo).")
-        sys.exit(1)
-    configure_netplan()
+    setup_netplan()
