@@ -189,11 +189,14 @@
                     <th class="h-10 px-4 text-left font-medium text-slate-500">
                       Origen
                     </th>
+                    <th class="h-10 px-4 text-left font-medium text-slate-500">
+                      Acción
+                    </th>
                   </tr>
                 </thead>
                 <tbody id="dbTableBody">
                   <tr id="noDbLogs">
-                    <td colspan="3" class="p-8 text-center text-slate-400">
+                    <td colspan="4" class="p-8 text-center text-slate-400">
                       Sin alertas de DB
                     </td>
                   </tr>
@@ -225,11 +228,14 @@
                     <th class="h-10 px-4 text-left font-medium text-slate-500">
                       Recurso / URI
                     </th>
+                    <th class="h-10 px-4 text-left font-medium text-slate-500">
+                      Acción
+                    </th>
                   </tr>
                 </thead>
                 <tbody id="nginxTableBody">
                   <tr id="noNginxLogs">
-                    <td colspan="3" class="p-8 text-center text-slate-400">
+                    <td colspan="4" class="p-8 text-center text-slate-400">
                       Sin tráfico Nginx
                     </td>
                   </tr>
@@ -245,13 +251,38 @@
       lucide.createIcons();
 
       let counts = { sqli: 0, http: 0 };
-      const ips = {}; // Keep for 'Origen Más Activo'
+      const ips = {};
+      let bannedList = [];
+
+      async function banPerson(ip) {
+        if (
+          !confirm(
+            `¿Estás seguro de bloquear la IP ${ip}? Esto cortará su acceso mediante IPTABLES.`
+          )
+        )
+          return;
+
+        try {
+          const response = await fetch("/api/ban", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ip }),
+          });
+          const result = await response.json();
+          if (response.ok) {
+            alert(result.message);
+          } else {
+            alert("Error: " + result.message);
+          }
+        } catch (e) {
+          alert("Error al conectar con el servidor.");
+        }
+      }
 
       function addLog(data) {
         const timestamp = new Date().toLocaleTimeString();
 
         if (data.event_type === "alert") {
-          // LOG PARA BASE DE DATOS / SEGURIDAD
           const noDb = document.getElementById("noDbLogs");
           if (noDb) noDb.remove();
 
@@ -259,7 +290,7 @@
           document.getElementById("sqliCount").innerText = counts.sqli;
 
           const src_ip = data.src_ip || "N/A";
-          ips[src_ip] = (ips[src_ip] || 0) + 1; // Update for 'Origen Más Activo'
+          ips[src_ip] = (ips[src_ip] || 0) + 1;
 
           const row = document.createElement("tr");
           row.className =
@@ -275,16 +306,19 @@
                         }</div>
                     </td>
                     <td class="p-4 font-mono text-xs text-slate-600">${src_ip}</td>
+                    <td class="p-4">
+                        <button onclick="banPerson('${src_ip}')" class="px-2 py-1 bg-red-600 text-white text-[10px] rounded hover:bg-red-700 transition-colors">BAN</button>
+                    </td>
                 `;
           document.getElementById("dbTableBody").prepend(row);
         } else {
-          // LOG PARA NGINX / TRAFICO HTTP
           const noNginx = document.getElementById("noNginxLogs");
           if (noNginx) noNginx.remove();
 
           counts.http++;
           document.getElementById("httpCount").innerText = counts.http;
 
+          const src_ip = data.src_ip || data.sensor_source || "N/A";
           const row = document.createElement("tr");
           row.className = "border-b hover:bg-slate-50 transition-colors";
 
@@ -295,10 +329,13 @@
                     <td class="p-4 font-mono text-xs">${timestamp}</td>
                     <td class="p-4"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100">${method}</span></td>
                     <td class="p-4 text-xs text-slate-600 truncate max-w-[200px]">${uri}</td>
+                    <td class="p-4">
+                         <button onclick="banPerson('${src_ip}')" class="px-2 py-1 border border-red-200 text-red-600 text-[10px] rounded hover:bg-red-50 transition-colors">BAN</button>
+                    </td>
                 `;
           document.getElementById("nginxTableBody").prepend(row);
         }
-        updateTopSource(); // Call to update 'Origen Más Activo'
+        updateTopSource();
       }
 
       function updateTopSource() {

@@ -9,34 +9,6 @@ from dotenv import load_dotenv, set_key
 
 app = Flask(__name__)
 
-# Rutas y Estados
-env_path = os.path.join(os.path.dirname(__file__), '.env')
-logs_storage = []
-
-# Estado de salud de los sensores
-sensors_health = {
-    "db": {"status": "OFFLINE", "last_seen": None, "ip": ""},
-    "nginx": {"status": "OFFLINE", "last_seen": None, "ip": ""}
-}
-
-def load_config():
-    if not os.path.exists(env_path):
-        # Crear .env con valores por defecto
-        with open(env_path, 'w') as f:
-            f.write("DB_IP=127.0.0.1\nNGINX_IP=127.0.0.1\n")
-    
-    load_dotenv(env_path)
-    return {
-        "db_ip": os.getenv("DB_IP", "127.0.0.1"),
-        "nginx_ip": os.getenv("NGINX_IP", "127.0.0.1")
-    }
-
-def save_config(config):
-    set_key(env_path, "DB_IP", config['db_ip'])
-    set_key(env_path, "NGINX_IP", config['nginx_ip'])
-
-current_config = load_config()
-
 # Colores para la terminal
 class Colors:
     HEADER = '\033[95m'
@@ -58,6 +30,65 @@ def get_host_ip():
         s.close()
     return ip
 
+# Rutas y Estados
+env_path = os.path.join(os.path.dirname(__file__), '.env')
+logs_storage = []
+banned_ips = [] # Lista de IPs bloqueadas por el Admin
+
+# Estado de salud de los sensores
+sensors_health = {
+    "db": {"status": "OFFLINE", "last_seen": None, "ip": ""},
+    "nginx": {"status": "OFFLINE", "last_seen": None, "ip": ""}
+}
+
+def load_config():
+    if not os.path.exists(env_path):
+        with open(env_path, 'w') as f:
+            f.write("DB_IP=127.0.0.1\nNGINX_IP=127.0.0.1\n")
+    
+    load_dotenv(env_path)
+    return {
+        "db_ip": os.getenv("DB_IP", "127.0.0.1"),
+        "nginx_ip": os.getenv("NGINX_IP", "127.0.0.1")
+    }
+
+def save_config(config):
+    set_key(env_path, "DB_IP", config['db_ip'])
+    set_key(env_path, "NGINX_IP", config['nginx_ip'])
+
+current_config = load_config()
+
+# --- API DE BLOQUEO (FIREWALL REMOTO) ---
+
+# --- API DE BLOQUEO (FIREWALL LOCAL) ---
+
+@app.route('/api/ban', methods=['POST'])
+def ban_ip():
+    """Bloquea una IP en el firewall local usando iptables"""
+    data = request.json
+    ip_to_ban = data.get('ip')
+    
+    if not ip_to_ban:
+        return jsonify({"status": "error", "message": "IP no proporcionada"}), 400
+
+    if ip_to_ban not in banned_ips:
+        try:
+            # Comando para bloquear en Linux (iptables)
+            subprocess.run(f"sudo iptables -I INPUT -s {ip_to_ban} -j DROP", shell=True, check=True)
+            banned_ips.append(ip_to_ban)
+            print(f"\n{Colors.FAIL}[!] IP BLOQUEADA MEDIANTE IPTABLES: {ip_to_ban}{Colors.ENDC}")
+            return jsonify({"status": "success", "message": f"IP {ip_to_ban} bloqueada con éxito."})
+        except Exception as e:
+            return jsonify({"status": "error", "message": f"Error al ejecutar iptables: {str(e)}"}), 500
+            
+    return jsonify({"status": "error", "message": "IP ya está en la lista negra."}), 400
+
+@app.route('/api/banned-list', methods=['GET'])
+def get_banned_list():
+    return jsonify({"banned_ips": banned_ips})
+
+# --- ENDPOINTS ---
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -68,10 +99,10 @@ def get_latest_logs():
     latest = list(logs_storage)
     logs_storage = [] 
     
-    # También enviamos el estado de salud de los sensores
     return jsonify({
         "logs": latest,
-        "health": sensors_health
+        "health": sensors_health,
+        "banned": banned_ips
     })
 
 @app.route('/api/config', methods=['GET', 'POST'])
