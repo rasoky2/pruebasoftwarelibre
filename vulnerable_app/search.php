@@ -1,98 +1,140 @@
 <?php
-include 'db_setup.php';
-$search = $_GET['q'] ?? '';
-$results = [];
+/**
+ * search.php - Buscador de Productos (Vulnerable a SQLi)
+ */
+require_once 'config.php';
 
-if ($search) {
-    // VULNERABILIDAD: Inyección SQL en la búsqueda
-    $query = "SELECT * FROM products WHERE name LIKE '%$search%' OR description LIKE '%$search%'";
-    try {
-        $stmt = $db->query($query);
-        $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    } catch (Exception $e) {
-        $error = "Error: " . $e->getMessage();
+$search = isset($_GET['q']) ? $_GET['q'] : '';
+
+// Conexión a la base de datos
+try {
+    $conn = new mysqli($DB_HOST, $DB_USER, $DB_PASS, $DB_NAME);
+    if ($conn->connect_error) {
+        die("Error de conexión: " . $conn->connect_error);
     }
+} catch (Exception $e) {
+    die("Error fatal: " . $e->getMessage());
 }
+
+// Lógica de búsqueda VULNERABLE (SQL Injection intencional)
+$sql = "SELECT * FROM products WHERE name LIKE '%$search%' OR description LIKE '%$search%'";
+$result = $conn->query($sql);
+
 ?>
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Search | SecureApp</title>
+    <title>Buscador de Productos | Light Store</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
     <style>
-        body { font-family: 'Inter', sans-serif; background-color: #020817; color: #f8fafc; }
-        .shadcn-card { background-color: #020817; border: 1px solid #1e293b; }
-        .shadcn-input { background-color: #020817; border: 1px solid #1e293b; color: #f8fafc; }
-        .shadcn-input:focus { border-color: #3b82f6; outline: none; }
-        .shadcn-primary { background-color: #f8fafc; color: #020817; }
-        .shadcn-secondary { background-color: #1e293b; color: #f8fafc; border: 1px solid #334155; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #fafafa;
+            color: #171717;
+        }
+        .search-container {
+            background: white;
+            border-bottom: 1px solid #e5e5e5;
+        }
+        .product-card {
+            background: white;
+            border: 1px solid #e5e5e5;
+            transition: all 0.2s ease;
+        }
+        .product-card:hover {
+            border-color: #a3a3a3;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+        }
     </style>
 </head>
-<body class="p-8">
-    <div class="max-w-4xl mx-auto">
-        <div class="flex items-center justify-between mb-8">
-            <div>
-                <h1 class="text-3xl font-bold tracking-tight text-white">Inventario de Productos</h1>
-                <p class="text-slate-400 mt-2">Buscador interno de stock disponible.</p>
+<body class="min-h-screen">
+    
+    <!-- Header / Search Bar -->
+    <header class="search-container sticky top-0 z-50 py-6">
+        <div class="container mx-auto px-4 max-w-4xl">
+            <div class="flex items-center justify-between mb-8">
+                <div class="flex items-center gap-2">
+                    <i data-lucide="shopping-bag" class="text-blue-600 h-6 w-6"></i>
+                    <h1 class="text-xl font-bold tracking-tight">Light Store</h1>
+                </div>
+                <a href="index.php" class="text-sm font-medium text-slate-500 hover:text-slate-900 flex items-center gap-1">
+                    <i data-lucide="log-out" class="h-4 w-4"></i> Salir
+                </a>
             </div>
-            <a href="index.php" class="text-sm font-medium text-slate-400 hover:text-white transition-colors">Volver al Login →</a>
-        </div>
 
-        <div class="shadcn-card rounded-xl p-6 mb-8">
-            <form method="GET" class="flex gap-4">
-                <input type="text" name="q" value="<?php echo $search; ?>" 
-                       class="shadcn-input flex-1 h-11 rounded-md px-4 py-2 text-sm"
-                       placeholder="Buscar por nombre o descripción...">
-                <button type="submit" class="shadcn-primary px-6 h-11 rounded-md text-sm font-semibold transition-colors">
+            <form action="search.php" method="GET" class="relative group">
+                <input 
+                    type="text" 
+                    name="q" 
+                    placeholder="Buscar productos (ej: Laptop, Teclado...)" 
+                    value="<?php echo htmlspecialchars($search); ?>"
+                    class="w-full h-14 pl-12 pr-4 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                >
+                <i data-lucide="search" class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 h-5 w-5"></i>
+                <button type="submit" class="absolute right-3 top-1/2 -translate-y-1/2 px-4 py-2 bg-slate-900 text-white text-xs font-semibold rounded-lg hover:bg-slate-800 transition-colors">
                     Buscar
                 </button>
             </form>
-        </div>
-
-        <?php if ($search): ?>
-            <div class="mb-6">
-                <p class="text-sm text-slate-400">Resultados para: <span class="text-blue-400 font-mono">"<?php echo $search; ?>"</span></p>
-            </div>
             
-            <div class="grid gap-4">
-                <?php if (!empty($results)): ?>
-                    <?php foreach ($results as $row): ?>
-                        <div class="shadcn-card rounded-lg p-5 border-l-4 border-l-blue-500">
-                            <h3 class="text-lg font-semibold text-white mb-2"><?php echo $row['name']; ?></h3>
-                            <p class="text-sm text-slate-400"><?php echo $row['description']; ?></p>
-                        </div>
-                    <?php endforeach; ?>
-                <?php else: ?>
-                    <div class="text-center py-12 shadcn-card rounded-xl border-dashed border-2">
-                        <p class="text-slate-500 italic">No se encontraron productos para tu búsqueda.</p>
-                    </div>
-                <?php endif; ?>
-            </div>
-        <?php endif; ?>
-
-        <div class="mt-12 rounded-lg border border-yellow-500/20 bg-yellow-500/5 p-6">
-            <h3 class="flex items-center gap-2 text-sm font-semibold text-yellow-500 uppercase tracking-wider mb-4">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
-                Laboratorio de Pruebas
-            </h3>
-            <div class="grid sm:grid-cols-2 gap-4 text-xs font-mono">
-                <div class="space-y-2">
-                    <p class="text-slate-500">Payload XSS Reflejado:</p>
-                    <code class="block bg-slate-900 p-2 rounded border border-slate-800 text-blue-400 break-all cursor-pointer hover:bg-slate-800" onclick="navigator.clipboard.writeText(this.innerText)">
-                        &lt;script&gt;alert('Reflected XSS')&lt;/script&gt;
-                    </code>
-                </div>
-                <div class="space-y-2">
-                    <p class="text-slate-500">SQLi Error-Based:</p>
-                    <code class="block bg-slate-900 p-2 rounded border border-slate-800 text-green-400 break-all cursor-pointer hover:bg-slate-800" onclick="navigator.clipboard.writeText(this.innerText)">
-                        ' UNION SELECT 1,username,password FROM users#
-                    </code>
-                </div>
-            </div>
+            <?php if ($search): ?>
+                <p class="text-xs text-slate-400 mt-4">
+                    Resultados para: <span class="text-slate-900 font-medium font-mono text-xs">"<?php echo $search; ?>"</span>
+                </p>
+            <?php endif; ?>
         </div>
-    </div>
+    </header>
+
+    <!-- Content -->
+    <main class="container mx-auto py-12 px-4 max-w-4xl">
+        <div class="grid gap-6 md:grid-cols-2">
+            <?php 
+            if ($result && $result->num_rows > 0) {
+                while($row = $result->fetch_assoc()) {
+                    ?>
+                    <div class="product-card p-6 rounded-2xl flex flex-col gap-4">
+                        <div class="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center">
+                            <i data-lucide="box" class="text-slate-400 h-6 w-6"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-slate-900 mb-1"><?php echo $row['name']; ?></h3>
+                            <p class="text-sm text-slate-500 leading-relaxed"><?php echo $row['description']; ?></p>
+                        </div>
+                        <div class="mt-auto pt-4 flex items-center justify-between">
+                            <span class="text-xs font-bold text-blue-600 uppercase tracking-widest">En Stock</span>
+                            <button class="text-xs font-medium text-slate-400 hover:text-slate-900 transition-colors">Ver detalles</button>
+                        </div>
+                    </div>
+                    <?php
+                }
+            } else {
+                ?>
+                <div class="col-span-full py-20 text-center">
+                    <div class="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i data-lucide="search-x" class="text-slate-400 h-10 w-10"></i>
+                    </div>
+                    <h3 class="text-lg font-bold text-slate-900">No se encontraron productos</h3>
+                    <p class="text-sm text-slate-500">Intenta con otros términos como "Laptop" o "Monitor".</p>
+                </div>
+                <?php
+            }
+            ?>
+        </div>
+
+        <!-- Debug Info (Opcional para el lab) -->
+        <div class="mt-20 pt-10 border-t border-dashed border-slate-200">
+            <p class="text-[10px] text-slate-300 font-mono">DEBUG SQL: <?php echo $sql; ?></p>
+        </div>
+    </main>
+
+    <script>
+        lucide.createIcons();
+    </script>
 </body>
 </html>
+<?php 
+$conn->close();
+?>
