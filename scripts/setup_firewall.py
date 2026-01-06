@@ -356,14 +356,22 @@ def setup_firewall():
         print(f"\n{Colors.HEADER}[*] Configurando FIREWALL para BASE DE DATOS...{Colors.ENDC}")
         nginx_ip = input(f"{Colors.OKBLUE}Ingrese IP del Nodo Nginx (Web Server) [{suggested_nginx}]: {Colors.ENDC}") or suggested_nginx
         
-        # Solo Nginx y Admin pueden hablar con MySQL (3306)
+        # 1. PING: Permitir desde Nginx también (no solo Admin)
+        if nginx_ip and nginx_ip != "127.0.0.1":
+            run_cmd(f"sudo iptables -A INPUT -p icmp -s {nginx_ip} -j ACCEPT", silent=True)
+            print(f"{Colors.OKGREEN}[OK] PING permitido desde Nginx ({nginx_ip}){Colors.ENDC}")
+
+        # 2. MySQL (3306): Permitir desde Nginx y Admin
         if nginx_ip and nginx_ip != "127.0.0.1":
             run_cmd(f"sudo iptables -A INPUT -p tcp -s {nginx_ip} --dport 3306 -j ACCEPT", silent=True)
             print(f"{Colors.OKGREEN}[OK] MySQL (3306) accesible desde Nginx ({nginx_ip}){Colors.ENDC}")
         
-        # Permitir MySQL desde Admin también
         run_cmd(f"sudo iptables -A INPUT -p tcp -s {admin_ip} --dport 3306 -j ACCEPT", silent=True)
         print(f"{Colors.OKGREEN}[OK] MySQL (3306) accesible desde Admin ({admin_ip}){Colors.ENDC}")
+        
+        # 3. Health Server (5001): Permitir acceso para monitoreo
+        run_cmd(f"sudo iptables -A INPUT -p tcp --dport 5001 -j ACCEPT", silent=True)
+        print(f"{Colors.OKGREEN}[OK] Health Server (5001) abierto para monitoreo{Colors.ENDC}")
         
         # Bloquear todo lo demás
         run_cmd("sudo iptables -P INPUT DROP", silent=True)

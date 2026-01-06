@@ -5,6 +5,7 @@ import json
 import requests
 import re
 import socket
+import threading
 
 def get_local_ip():
     try:
@@ -67,6 +68,50 @@ def configure_suricata(main_server_ip):
     else:
         print("[!] Advertencia: No se encontró suricata.yaml base.")
 
+def check_db_health(user, password, host, database):
+    """Verifica si la base de datos está activa"""
+    try:
+        # Usar el comando mysql directamente para evitar dependencias extras de python-mysql
+        cmd = f"mysql -u{user} -p{password} -h{host} -e 'SELECT 1;' {database}"
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+        return result.returncode == 0
+    except:
+        return False
+
+def run_health_server(config):
+    """Inicia un servidor Flask minimalista para reportar el estado de la DB"""
+    try:
+        from flask import Flask, Response
+    except ImportError:
+        print("[*] Instalando Flask para el Health Server...")
+        subprocess.run([sys.executable, "-m", "pip", "install", "flask"], check=True)
+        from flask import Flask, Response
+
+    app = Flask(__name__)
+
+    @app.route('/')
+    def status():
+        is_healthy = check_db_health(
+            config['DB_USER'], 
+            config['DB_PASS'], 
+            config['DB_HOST'], 
+            config['DB_NAME']
+        )
+        status_text = "DATABASE STATUS: ONLINE" if is_healthy else "DATABASE STATUS: OFFLINE"
+        return Response(status_text, mimetype='text/plain')
+
+    local_ip = get_local_ip()
+    print(f"\n{Colors_OKGREEN}[*] Health Server iniciado en http://{local_ip}:5001{Colors_ENDC}")
+    print("[*] Presiona Ctrl+C para detener el monitor.")
+    app.run(host='0.0.0.0', port=5001, debug=False)
+
+# Definir colores para consistencia
+Colors_OKGREEN = '\033[92m'
+Colors_FAIL = '\033[91m'
+Colors_WARNING = '\033[93m'
+Colors_OKBLUE = '\033[94m'
+Colors_ENDC = '\033[0m'
+
 def setup_db_config():
     print("\n" + "="*50)
     print("   DB & SECURITY SETUP (MySQL + Suricata)")
@@ -111,8 +156,17 @@ def setup_db_config():
     
     print("\n" + "="*50)
     print("   ¡CONFIGURACIÓN COMPLETADA!")
-    print(f"   Próximo paso: Ejecutar log_shipper.php para enviar datos.")
-    print("="*50 + "\n")
+    print("="*50)
+
+    # 3. Health Server
+    if input("\n¿Desea iniciar el Servidor de Estado (Health Server) en el puerto 5001? (s/N): ").lower() == 's':
+        config = {
+            'DB_USER': db_user,
+            'DB_PASS': db_pass,
+            'DB_HOST': db_host,
+            'DB_NAME': db_name
+        }
+        run_health_server(config)
 
 if __name__ == "__main__":
     setup_db_config()
