@@ -193,11 +193,11 @@ def diagnostico_final(role, admin_ip, nginx_ip=None, db_ip=None):
     elif role == '2':  # Nginx
         print(f"{Colors.BOLD}Verificando conectividad desde Nginx:{Colors.ENDC}\n")
         
-        # Probar Admin (Controlador)
-        print(f"{Colors.HEADER}→ Conectividad con Servidor Admin (Controlador):{Colors.ENDC}")
+        # Probar Admin (Dashboard)
+        print(f"\n{Colors.HEADER}→ Conectividad con Servidor Admin (Dashboard):{Colors.ENDC}")
         results['admin_ping'] = test_connectivity(admin_ip, "Admin/Controlador")
         results['admin_ssh'] = test_port(admin_ip, 22, "SSH")
-        results['admin_dashboard'] = test_port(admin_ip, 5000, "Dashboard")
+        results['admin_dashboard'] = test_port(admin_ip, 5000, "Dashboard (Shipper)")
         
         # Probar Base de Datos
         if db_ip and db_ip != "127.0.0.1":
@@ -208,6 +208,35 @@ def diagnostico_final(role, admin_ip, nginx_ip=None, db_ip=None):
         # Probar a sí mismo (Nginx)
         print(f"\n{Colors.HEADER}→ Verificación local (Nginx):{Colors.ENDC}")
         print(f"{Colors.OKGREEN}[OK] Servidor Nginx - Configurado correctamente{Colors.ENDC}")
+        
+        # Verificar si Suricata está instalado
+        try:
+            suricata_status = subprocess.run(["systemctl", "is-active", "suricata"], 
+                                            capture_output=True, text=True)
+            if suricata_status.stdout.strip() == "active":
+                print(f"{Colors.OKGREEN}[OK] Suricata IDS - Activo{Colors.ENDC}")
+                results['suricata'] = True
+            else:
+                print(f"{Colors.WARNING}[!] Suricata IDS - No activo{Colors.ENDC}")
+                results['suricata'] = False
+        except Exception:
+            print(f"{Colors.WARNING}[!] Suricata IDS - No instalado{Colors.ENDC}")
+            results['suricata'] = False
+        
+        # Verificar si log-shipper está corriendo
+        try:
+            shipper_status = subprocess.run(["systemctl", "is-active", "log-shipper"], 
+                                           capture_output=True, text=True)
+            if shipper_status.stdout.strip() == "active":
+                print(f"{Colors.OKGREEN}[OK] Log Shipper - Activo (enviando a {admin_ip}:5000){Colors.ENDC}")
+                results['log_shipper'] = True
+            else:
+                print(f"{Colors.WARNING}[!] Log Shipper - No activo{Colors.ENDC}")
+                results['log_shipper'] = False
+        except Exception:
+            print(f"{Colors.WARNING}[!] Log Shipper - No instalado{Colors.ENDC}")
+            results['log_shipper'] = False
+        
         results['nginx_local'] = True
         
     elif role == '3':  # Admin
@@ -394,9 +423,14 @@ def setup_firewall():
         run_cmd("sudo iptables -A INPUT -p tcp --dport 80 -j ACCEPT", silent=True)
         print(f"{Colors.OKGREEN}[OK] HTTP (80) abierto al público{Colors.ENDC}")
         
+        # Permitir enviar logs al Dashboard (puerto 5000)
+        run_cmd(f"sudo iptables -A OUTPUT -p tcp -d {admin_ip} --dport 5000 -j ACCEPT", silent=True)
+        print(f"{Colors.OKGREEN}[OK] Conexión saliente al Dashboard ({admin_ip}:5000) permitida{Colors.ENDC}")
+        
         # Bloquear todo lo demás (SSH ya está permitido desde Admin)
         run_cmd("sudo iptables -P INPUT DROP", silent=True)
         print(f"{Colors.WARNING}[OK] Política por defecto: DROP (Solo HTTP público y Admin SSH){Colors.ENDC}")
+
 
     elif choice == '3':
         print(f"\n{Colors.HEADER}[*] Configurando FIREWALL para ADMIN (Main)...{Colors.ENDC}")

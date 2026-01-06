@@ -1,0 +1,19 @@
+[Unit]
+Description=Suricata Log Shipper - Envía alertas al Dashboard Central
+After=network.target suricata.service
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/var/www/html/pruebasoftwarelibre/vulnerable_app
+ExecStart=/usr/bin/php /var/www/html/pruebasoftwarelibre/vulnerable_app/log_shipper.php
+Restart=always
+RestartSec=10
+
+# Logs del servicio
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=log-shipper
+
+[Install]
+WantedBy=multi-user.target
