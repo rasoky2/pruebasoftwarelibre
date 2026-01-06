@@ -52,6 +52,40 @@ def verificar_iptables():
         print(f"{Colors.OKGREEN}[OK] iptables está instalado{Colors.ENDC}")
         return True
 
+def verificar_netplan():
+    """Verifica si netplan está configurado y es coherente"""
+    print(f"\n{Colors.OKBLUE}[*] Verificando configuración de Netplan...{Colors.ENDC}")
+    
+    netplan_dir = "/etc/netplan/"
+    if not os.path.exists(netplan_dir):
+        print(f"{Colors.WARNING}[!] No se encontró el directorio /etc/netplan/. Ignorando...{Colors.ENDC}")
+        return True
+    
+    files = [f for f in os.listdir(netplan_dir) if f.endswith('.yaml') or f.endswith('.yml')]
+    if not files:
+        print(f"{Colors.WARNING}[!] No hay archivos de configuración en /etc/netplan/{Colors.ENDC}")
+        return True
+    
+    print(f"{Colors.OKBLUE}[*] Archivos encontrados: {', '.join(files)}{Colors.ENDC}")
+    
+    # Probar generación de configuración
+    result = subprocess.run("sudo netplan generate", shell=True, capture_output=True, text=True)
+    if result.returncode != 0:
+        print(f"{Colors.FAIL}[!] Error en la sintaxis de Netplan:{Colors.ENDC}")
+        print(f"{Colors.FAIL}{result.stderr}{Colors.ENDC}")
+        return False
+    else:
+        print(f"{Colors.OKGREEN}[OK] Sintaxis de Netplan válida{Colors.ENDC}")
+    
+    # Verificar activador
+    result = subprocess.run("networkctl status", shell=True, capture_output=True, text=True)
+    if "systemd-networkd" in result.stdout:
+        print(f"{Colors.OKGREEN}[OK] Renderizador: systemd-networkd activado{Colors.ENDC}")
+    else:
+        print(f"{Colors.WARNING}[!] Advertencia: systemd-networkd no parece ser el renderizador principal{Colors.ENDC}")
+        
+    return True
+
 def verificar_reglas_existentes():
     """Verifica si ya existen reglas de iptables configuradas"""
     result = subprocess.run("sudo iptables -L -n", shell=True, capture_output=True, text=True)
@@ -265,6 +299,12 @@ def setup_firewall():
     # Verificar instalación de iptables
     if not verificar_iptables():
         sys.exit(1)
+    
+    # Verificar configuración de Netplan (Red)
+    if not verificar_netplan():
+        print(f"{Colors.WARNING}[!] La configuración de Netplan tiene errores. ¿Desea continuar de todos modos? (s/N): {Colors.ENDC}", end="")
+        if input().lower() != 's':
+            sys.exit(1)
     
     # Verificar si ya existen reglas
     if not verificar_reglas_existentes():
