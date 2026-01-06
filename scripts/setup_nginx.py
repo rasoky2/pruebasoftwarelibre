@@ -5,6 +5,8 @@ import subprocess
 import json
 import requests
 
+import re
+
 def get_local_ip():
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -14,6 +16,36 @@ def get_local_ip():
         return ip
     except Exception:
         return "127.0.0.1"
+
+def install_suricata():
+    print("\n[*] Instalando Suricata (Sistema de Detección de Intrusos)...")
+    try:
+        subprocess.run(["sudo", "apt", "update"], check=True)
+        subprocess.run(["sudo", "apt", "install", "-y", "suricata"], check=True)
+        print("[OK] Suricata instalado.")
+    except Exception as e:
+        print(f"[!] Error al instalar Suricata: {e}")
+
+def configure_suricata(main_server_ip):
+    print("[*] Configurando Suricata en Nodo de Borde...")
+    local_ip = get_local_ip()
+    suricata_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "suricata"))
+    suricata_yaml = os.path.join(suricata_dir, "suricata.yaml")
+    local_rules = os.path.join(suricata_dir, "rules", "local.rules")
+
+    if os.path.exists(suricata_yaml):
+        with open(suricata_yaml, "r") as f: content = f.read()
+        
+        # HOME_NET y Reglas
+        content = re.sub(r'HOME_NET: "\[.*?\]"', f'HOME_NET: "[{local_ip}/32]"', content)
+        if "rule-files:" in content:
+            if "local.rules" not in content:
+                content = content.replace("rule-files:", f"rule-files:\n  - {local_rules}")
+        
+        with open(suricata_yaml, "w") as f: f.write(content)
+        print(f"[OK] Suricata configurado (HOME_NET: {local_ip})")
+    else:
+        print("[!] Advertencia: No se encontró suricata.yaml base.")
 
 def setup_nginx():
     if os.geteuid() != 0:
@@ -84,6 +116,21 @@ def setup_nginx():
             print("\n[!] Error en la sintaxis de Nginx. Revise la consola.")
 
         if os.path.exists("nginx_temp.conf"): os.remove("nginx_temp.conf")
+
+        # Configuración de Seguridad (Suricata)
+        main_server_ip = input(f"IP Servidor Main (Dashboard) [{local_ip}]: ") or local_ip
+        if input("\n¿Desea instalar y configurar Suricata IDS en este nodo? (s/N): ").lower() == 's':
+            install_suricata()
+            configure_suricata(main_server_ip)
+            
+            print(f"[*] Sincronizando IP del Dashboard en config.php...")
+            from setup_inventory import update_config_php
+            update_config_php({
+                "MAIN_SERVER_IP": main_server_ip,
+                "MAIN_SERVER_PORT": "5000",
+                "SURICATA_SENSOR_IP": local_ip
+            })
+            print(f"[OK] Shipper configurado para enviar a http://{main_server_ip}:5000")
         
     except Exception as e:
         print(f"[!] Error: {e}")

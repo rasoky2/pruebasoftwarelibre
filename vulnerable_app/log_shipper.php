@@ -39,9 +39,11 @@ while (true) {
 
     $logData = json_decode($line, true);
     
-    // Solo enviar si es una alerta
-    if (isset($logData['event_type']) && $logData['event_type'] === 'alert') {
-        enviarLog($logData, $mainServerUrl);
+    // Enviar alertas y estadísticas de recursos (stats)
+    if (isset($logData['event_type'])) {
+        if ($logData['event_type'] === 'alert' || $logData['event_type'] === 'stats') {
+            enviarLog($logData, $mainServerUrl);
+        }
     }
 }
 

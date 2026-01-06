@@ -117,6 +117,12 @@ def receive_suricata_log():
             
             print(f"\n{Colors.BOLD}{Colors.FAIL}[!] ALERTA DESDE SENSOR {sensor_ip} [!]{Colors.ENDC}")
             print(f"{Colors.OKBLUE}Ataque:{Colors.ENDC} {signature} | {Colors.OKBLUE}Atacante:{Colors.ENDC} {src_ip}")
+        
+        # Si son estadísticas de recursos del sensor
+        elif data.get('event_type') == 'stats':
+            stats = data.get('stats', {})
+            uptime = stats.get('uptime', 0)
+            print(f"{Colors.OKGREEN}[H] Salud Sensor {sensor_ip}:{Colors.ENDC} Uptime: {uptime}s | Log recibido OK")
             
         return jsonify({"status": "success"}), 200
     except Exception as e:
