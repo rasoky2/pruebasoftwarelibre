@@ -2,44 +2,115 @@
 /**
  * ARCHIVO: auth_ldap.php
  * Propósito: Módulo de autenticación LDAP (Integración Proyecto Agustín)
+ * Versión: 2.0 - Detección mejorada de conectividad
  */
 
+require_once __DIR__ . '/config.php';
+
 $ldap_connection_error = null;
+$ldap_server_online = false;
 
-function autenticar_con_ldap($usuario, $password) {
-    global $ldap_connection_error;
-    
-    // 1. Datos del Servidor LDAP (Configurables)
-    $ldap_host = "10.172.86.161"; 
-    $ldap_port = 389;
-    $ldap_dn_base = "ou=usuarios,dc=softwarelibre,dc=local";
-
-    // 2. Conectar al servidor
-    $connect = @ldap_connect($ldap_host, $ldap_port);
-    
-    if (!$connect) {
-        $ldap_connection_error = "Servidor LDAP inalcanzable.";
-        return false;
-    }
-
-    ldap_set_option($connect, LDAP_OPT_PROTOCOL_VERSION, 3);
-    ldap_set_option($connect, LDAP_OPT_NETWORK_TIMEOUT, 2);
-
-    if ($connect) {
-        $user_dn = "uid=" . $usuario . "," . $ldap_dn_base;
-        $bind = @ldap_bind($connect, $user_dn, $password);
-
-        if ($bind) {
-            ldap_close($connect);
-            return true; 
-        } else {
-            $ldap_connection_error = "Credenciales LDAP incorrectas o servidor rechazó conexión.";
-            ldap_close($connect);
-            return false;
-        }
+/**
+ * Verifica si el servidor LDAP está accesible mediante socket
+ */
+function verificar_servidor_ldap($host, $port = 389, $timeout = 2) {
+    $socket = @fsockopen($host, $port, $errno, $errstr, $timeout);
+    if ($socket) {
+        fclose($socket);
+        return true;
     }
     return false;
 }
+
+/**
+ * Autenticación con servidor LDAP corporativo
+ */
+function autenticar_con_ldap($usuario, $password) {
+    global $ldap_connection_error, $LDAP_HOST;
+    
+    // Datos del Servidor LDAP (desde config.php)
+    $ldap_host = $LDAP_HOST;
+    $ldap_port = 389;
+    $ldap_dn_base = "ou=usuarios,dc=softwarelibre,dc=local";
+
+    // Verificación previa de conectividad
+    if (!verificar_servidor_ldap($ldap_host, $ldap_port, 2)) {
+        $ldap_connection_error = "Servidor LDAP inalcanzable ($ldap_host:$ldap_port)";
+        return false;
+    }
+
+    // Intentar conexión LDAP
+    $connect = @ldap_connect($ldap_host, $ldap_port);
+    
+    if (!$connect) {
+        $ldap_connection_error = "Error al inicializar conexión LDAP";
+        return false;
+    }
+
+    // Configurar opciones de protocolo
+    ldap_set_option($connect, LDAP_OPT_PROTOCOL_VERSION, 3);
+    ldap_set_option($connect, LDAP_OPT_NETWORK_TIMEOUT, 3);
+    ldap_set_option($connect, LDAP_OPT_REFERRALS, 0);
+
+    // Construir DN del usuario
+    $user_dn = "uid=" . ldap_escape($usuario, '', LDAP_ESCAPE_DN) . "," . $ldap_dn_base;
+    
+    // Intentar autenticación
+    $bind = @ldap_bind($connect, $user_dn, $password);
+
+    if ($bind) {
+        ldap_close($connect);
+        return true;
+    } else {
+        $error_code = ldap_errno($connect);
+        if ($error_code === 49) {
+            $ldap_connection_error = "Credenciales LDAP incorrectas";
+        } else {
+            $ldap_connection_error = "Error de autenticación LDAP (Código: $error_code)";
+        }
+        ldap_close($connect);
+        return false;
+    }
+}
+
+/**
+ * Verifica el estado del servidor LDAP (para health check)
+ */
+function verificar_estado_ldap() {
+    global $ldap_server_online, $ldap_connection_error, $LDAP_HOST;
+    
+    $ldap_host = $LDAP_HOST;
+    $ldap_port = 389;
+    
+    // Verificar conectividad básica
+    if (!verificar_servidor_ldap($ldap_host, $ldap_port, 2)) {
+        $ldap_server_online = false;
+        $ldap_connection_error = "Servidor LDAP inalcanzable";
+        return false;
+    }
+    
+    // Intentar conexión completa
+    $connect = @ldap_connect($ldap_host, $ldap_port);
+    if ($connect) {
+        ldap_set_option($connect, LDAP_OPT_PROTOCOL_VERSION, 3);
+        ldap_set_option($connect, LDAP_OPT_NETWORK_TIMEOUT, 2);
+        
+        // Intentar bind anónimo para verificar que el servidor responde
+        $bind = @ldap_bind($connect);
+        ldap_close($connect);
+        
+        $ldap_server_online = true;
+        $ldap_connection_error = null;
+        return true;
+    }
+    
+    $ldap_server_online = false;
+    $ldap_connection_error = "Servidor LDAP no responde";
+    return false;
+}
+
+// Verificar estado al cargar el módulo
+verificar_estado_ldap();
 
 // Logica de procesamiento si se accede directamente (opcional)
 if (isset($_POST['ldap_login'])) {

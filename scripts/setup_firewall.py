@@ -34,11 +34,19 @@ def setup_firewall():
     
     choice = input("\nOpción (1-3): ")
 
-    admin_ip = input("Ingrese IP del Servidor Admin (Control): ")
-    if not admin_ip:
-        print("[!] La IP del Admin es obligatoria para no perder el control.")
-        return
+    # Cargar sugerencias del .env si existe
+    env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env')
+    suggested_admin = "127.0.0.1"
+    suggested_nginx = "127.0.0.1"
+    
+    if os.path.exists(env_path):
+        with open(env_path, 'r') as f:
+            for line in f:
+                if "NGINX_IP=" in line: suggested_admin = line.split('=')[1].strip()
+                if "NGINX_IP=" in line: suggested_nginx = line.split('=')[1].strip()
 
+    admin_ip = input(f"Ingrese IP del Servidor Admin (Default {suggested_admin}): ") or suggested_admin
+    
     reset_iptables()
 
     # Reglas comunes

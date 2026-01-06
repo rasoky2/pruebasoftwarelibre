@@ -83,13 +83,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     </span>
                 <?php endif; ?>
 
-                <?php if ($ldap_connection_error && strpos($ldap_connection_error, 'inalcanzable') !== false): ?>
-                    <span class="inline-flex items-center rounded-full bg-red-400/10 px-2.5 py-0.5 text-xs font-medium text-red-400 border border-red-400/20">
+                <?php if (!$ldap_server_online): ?>
+                    <span class="inline-flex items-center rounded-full bg-red-400/10 px-2.5 py-0.5 text-xs font-medium text-red-400 border border-red-400/20" title="<?php echo $ldap_connection_error; ?>">
                         <span class="mr-1 h-1.5 w-1.5 rounded-full bg-red-500"></span> LDAP Offline
                     </span>
                 <?php else: ?>
                     <span class="inline-flex items-center rounded-full bg-blue-400/10 px-2.5 py-0.5 text-xs font-medium text-blue-400 border border-blue-400/20">
-                        <span class="mr-1 h-1.5 w-1.5 rounded-full bg-blue-500"></span> LDAP Ready
+                        <span class="mr-1 h-1.5 w-1.5 rounded-full bg-blue-500"></span> LDAP Online
                     </span>
                 <?php endif; ?>
             </div>

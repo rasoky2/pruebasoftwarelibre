@@ -31,7 +31,7 @@ def get_host_ip():
     return ip
 
 # Rutas y Estados
-env_path = os.path.join(os.path.dirname(__file__), '.env')
+env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env')
 logs_storage = []
 banned_ips = [] # Lista de IPs bloqueadas por el Admin
 

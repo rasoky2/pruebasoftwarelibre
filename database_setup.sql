@@ -11,11 +11,17 @@ CREATE TABLE IF NOT EXISTS users (
     role VARCHAR(20) NOT NULL
 );
 
--- Insertar datos de prueba
+-- Insertar datos de prueba (Usuarios Tradicionales - NO Corporativos)
+-- Estos usuarios NO existen en LDAP, solo en la base de datos local
 INSERT INTO users (username, password, role) VALUES 
 ('admin', 'admin123', 'admin'),
-('user', 'user123', 'user'),
-('root', 'toor', 'admin');
+('webmaster', 'web2024', 'admin'),
+('operador', 'op123456', 'user'),
+('soporte', 'support99', 'user'),
+('invitado', 'guest2024', 'guest'),
+('testuser', 'test123', 'user'),
+('developer', 'dev2024', 'developer'),
+('auditor', 'audit123', 'auditor');
 
 -- Tabla de Productos (Vulnerable a XSS/SQLi)
 CREATE TABLE IF NOT EXISTS products (
