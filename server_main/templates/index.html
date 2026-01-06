@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Security Monitor | Shadcn UI</title>
+    <title>Security Dashboard | Network Topology</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
@@ -20,26 +20,10 @@
         background: white;
         border: 1px solid #e2e8f0;
         border-radius: 0.75rem;
-        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1),
-          0 1px 2px 0 rgba(0, 0, 0, 0.06);
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
       }
-      .severity-high {
-        background-color: #fee2e2;
-        color: #991b1b;
-        border: 1px solid #fecaca;
-      }
-      .severity-low {
-        background-color: #f0fdf4;
-        color: #166534;
-        border: 1px solid #bbf7d0;
-      }
-      .badge {
-        display: inline-flex;
-        align-items: center;
-        border-radius: 9999px;
-        padding: 0.125rem 0.625rem;
-        font-size: 0.75rem;
-        font-weight: 600;
+      .node-active {
+        filter: drop-shadow(0 0 8px rgba(34, 197, 94, 0.4));
       }
     </style>
   </head>
@@ -56,11 +40,16 @@
         </div>
         <div class="flex items-center gap-4">
           <button
+            onclick="openNetworkMap()"
+            class="flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-800 transition-colors"
+          >
+            <i data-lucide="network" class="h-4 w-4"></i> Mapa de Red
+          </button>
+          <button
             onclick="openConfig()"
             class="flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"
           >
-            <i data-lucide="settings" class="h-4 w-4"></i>
-            Configuración
+            <i data-lucide="settings" class="h-4 w-4"></i> Configuración
           </button>
           <div
             class="flex items-center gap-1.5 text-sm font-medium text-slate-500 border-l pl-4"
@@ -80,23 +69,21 @@
     </header>
 
     <main class="container mx-auto py-8 px-4">
-      <!-- Stats Row -->
+      <!-- Health & Stats Row -->
       <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
-        <!-- Sensor Salud: DB -->
+        <!-- DB Health -->
         <div
-          class="shadcn-card p-6 border-l-4 border-slate-200"
+          class="shadcn-card p-6 border-l-4 border-slate-200 transition-colors"
           id="dbHealthCard"
         >
-          <div class="flex items-center justify-between space-y-0 pb-2">
-            <h3
-              class="text-sm font-medium text-slate-500 uppercase tracking-wider"
-            >
+          <div class="flex items-center justify-between pb-2">
+            <h3 class="text-xs font-medium text-slate-500 uppercase">
               Estado Database
             </h3>
             <span class="relative flex h-3 w-3">
               <span
                 id="dbPing"
-                class="absolute inline-flex h-full w-full rounded-full bg-slate-400 opacity-75"
+                class="absolute inline-flex h-full w-full rounded-full opacity-75"
               ></span>
               <span
                 id="dbDot"
@@ -109,22 +96,19 @@
             Esperando señal...
           </p>
         </div>
-
-        <!-- Sensor Salud: Nginx -->
+        <!-- Nginx Health -->
         <div
-          class="shadcn-card p-6 border-l-4 border-slate-200"
+          class="shadcn-card p-6 border-l-4 border-slate-200 transition-colors"
           id="nginxHealthCard"
         >
-          <div class="flex items-center justify-between space-y-0 pb-2">
-            <h3
-              class="text-sm font-medium text-slate-500 uppercase tracking-wider"
-            >
+          <div class="flex items-center justify-between pb-2">
+            <h3 class="text-xs font-medium text-slate-500 uppercase">
               Estado Nginx/Edge
             </h3>
             <span class="relative flex h-3 w-3">
               <span
                 id="nginxPing"
-                class="absolute inline-flex h-full w-full rounded-full bg-slate-400 opacity-75"
+                class="absolute inline-flex h-full w-full rounded-full opacity-75"
               ></span>
               <span
                 id="nginxDot"
@@ -137,46 +121,41 @@
             Esperando señal...
           </p>
         </div>
-
-        <!-- Stats logs se mantienen pero se ajustan IDs -->
+        <!-- Alerts -->
         <div class="shadcn-card p-6">
-          <div class="flex items-center justify-between space-y-0 pb-2">
-            <h3
-              class="text-sm font-medium text-slate-500 uppercase tracking-wider"
-            >
-              Alertas DB
+          <div class="flex items-center justify-between pb-2">
+            <h3 class="text-xs font-medium text-slate-500 uppercase">
+              Alertas Seguridad
             </h3>
             <i data-lucide="shield-alert" class="h-4 w-4 text-red-500"></i>
           </div>
           <div class="text-2xl font-bold text-red-600" id="sqliCount">0</div>
-          <p class="text-xs text-slate-400 mt-1">Detecciones críticas</p>
+          <p class="text-[10px] text-slate-400 mt-1">
+            Detecciones SQLi/Ataques
+          </p>
         </div>
-
+        <!-- Traffic -->
         <div class="shadcn-card p-6">
-          <div class="flex items-center justify-between space-y-0 pb-2">
-            <h3
-              class="text-sm font-medium text-slate-500 uppercase tracking-wider"
-            >
+          <div class="flex items-center justify-between pb-2">
+            <h3 class="text-xs font-medium text-slate-500 uppercase">
               Peticiones Total
             </h3>
             <i data-lucide="refresh-cw" class="h-4 w-4 text-blue-500"></i>
           </div>
           <div class="text-2xl font-bold" id="httpCount">0</div>
-          <p class="text-xs text-slate-400 mt-1">Tráfico analizado</p>
+          <p class="text-[10px] text-slate-400 mt-1">Tráfico HTTP analizado</p>
         </div>
       </div>
 
       <div class="grid lg:grid-cols-2 gap-8">
-        <!-- Sección 1: Base de Datos / Seguridad -->
+        <!-- DB Alerts Table -->
         <div class="space-y-4">
           <div class="flex items-center gap-2 px-2">
             <i data-lucide="database" class="text-red-600 h-5 w-5"></i>
-            <h2 class="text-lg font-bold tracking-tight">
-              Security Alerts (Database)
-            </h2>
+            <h2 class="text-lg font-bold">Security Alerts (Database)</h2>
           </div>
           <div class="shadcn-card overflow-hidden">
-            <div class="overflow-x-auto max-h-[500px] overflow-y-auto">
+            <div class="overflow-x-auto max-h-[500px]">
               <table class="w-full text-sm">
                 <thead class="sticky top-0 bg-white border-b z-10">
                   <tr>
@@ -184,7 +163,7 @@
                       Hora
                     </th>
                     <th class="h-10 px-4 text-left font-medium text-slate-500">
-                      Firma / Ataque
+                      Ataque
                     </th>
                     <th class="h-10 px-4 text-left font-medium text-slate-500">
                       Origen
@@ -196,8 +175,11 @@
                 </thead>
                 <tbody id="dbTableBody">
                   <tr id="noDbLogs">
-                    <td colspan="4" class="p-8 text-center text-slate-400">
-                      Sin alertas de DB
+                    <td
+                      colspan="4"
+                      class="p-8 text-center text-slate-400 italic"
+                    >
+                      Esperando ataques...
                     </td>
                   </tr>
                 </tbody>
@@ -206,16 +188,14 @@
           </div>
         </div>
 
-        <!-- Sección 2: Nginx / Tráfico -->
+        <!-- Nginx Table -->
         <div class="space-y-4">
           <div class="flex items-center gap-2 px-2">
             <i data-lucide="server" class="text-blue-600 h-5 w-5"></i>
-            <h2 class="text-lg font-bold tracking-tight">
-              Access Logs (Nginx)
-            </h2>
+            <h2 class="text-lg font-bold">Access Logs (Nginx)</h2>
           </div>
           <div class="shadcn-card overflow-hidden">
-            <div class="overflow-x-auto max-h-[500px] overflow-y-auto">
+            <div class="overflow-x-auto max-h-[500px]">
               <table class="w-full text-sm">
                 <thead class="sticky top-0 bg-white border-b z-10">
                   <tr>
@@ -226,7 +206,7 @@
                       Método
                     </th>
                     <th class="h-10 px-4 text-left font-medium text-slate-500">
-                      Recurso / URI
+                      URI
                     </th>
                     <th class="h-10 px-4 text-left font-medium text-slate-500">
                       Acción
@@ -235,8 +215,11 @@
                 </thead>
                 <tbody id="nginxTableBody">
                   <tr id="noNginxLogs">
-                    <td colspan="4" class="p-8 text-center text-slate-400">
-                      Sin tráfico Nginx
+                    <td
+                      colspan="4"
+                      class="p-8 text-center text-slate-400 italic"
+                    >
+                      Esperando tráfico...
                     </td>
                   </tr>
                 </tbody>
@@ -247,242 +230,361 @@
       </div>
     </main>
 
-    <script>
-      lucide.createIcons();
-
-      let counts = { sqli: 0, http: 0 };
-      const ips = {};
-      let bannedList = [];
-
-      async function banPerson(ip) {
-        if (
-          !confirm(
-            `¿Estás seguro de bloquear la IP ${ip}? Esto cortará su acceso mediante IPTABLES.`
-          )
-        )
-          return;
-
-        try {
-          const response = await fetch("/api/ban", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ ip }),
-          });
-          const result = await response.json();
-          if (response.ok) {
-            alert(result.message);
-          } else {
-            alert("Error: " + result.message);
-          }
-        } catch (e) {
-          alert("Error al conectar con el servidor.");
-        }
-      }
-
-      function addLog(data) {
-        const timestamp = new Date().toLocaleTimeString();
-
-        if (data.event_type === "alert") {
-          const noDb = document.getElementById("noDbLogs");
-          if (noDb) noDb.remove();
-
-          counts.sqli++;
-          document.getElementById("sqliCount").innerText = counts.sqli;
-
-          const src_ip = data.src_ip || "N/A";
-          ips[src_ip] = (ips[src_ip] || 0) + 1;
-
-          const row = document.createElement("tr");
-          row.className =
-            "border-b bg-red-50/20 hover:bg-red-100/30 transition-colors";
-          row.innerHTML = `
-                    <td class="p-4 font-mono text-xs">${timestamp}</td>
-                    <td class="p-4">
-                        <div class="font-bold text-red-700 text-xs">${
-                          data.alert.signature
-                        }</div>
-                        <div class="text-[10px] text-slate-400 truncate max-w-[200px]">${
-                          data.payload_printable || ""
-                        }</div>
-                    </td>
-                    <td class="p-4 font-mono text-xs text-slate-600">${src_ip}</td>
-                    <td class="p-4">
-                        <button onclick="banPerson('${src_ip}')" class="px-2 py-1 bg-red-600 text-white text-[10px] rounded hover:bg-red-700 transition-colors">BAN</button>
-                    </td>
-                `;
-          document.getElementById("dbTableBody").prepend(row);
-        } else {
-          const noNginx = document.getElementById("noNginxLogs");
-          if (noNginx) noNginx.remove();
-
-          counts.http++;
-          document.getElementById("httpCount").innerText = counts.http;
-
-          const src_ip = data.src_ip || data.sensor_source || "N/A";
-          const row = document.createElement("tr");
-          row.className = "border-b hover:bg-slate-50 transition-colors";
-
-          const method = data.http ? data.http.http_method : "GET";
-          const uri = data.http ? data.http.url : data.nginx_msg || "/";
-
-          row.innerHTML = `
-                    <td class="p-4 font-mono text-xs">${timestamp}</td>
-                    <td class="p-4"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100">${method}</span></td>
-                    <td class="p-4 text-xs text-slate-600 truncate max-w-[200px]">${uri}</td>
-                    <td class="p-4">
-                         <button onclick="banPerson('${src_ip}')" class="px-2 py-1 border border-red-200 text-red-600 text-[10px] rounded hover:bg-red-50 transition-colors">BAN</button>
-                    </td>
-                `;
-          document.getElementById("nginxTableBody").prepend(row);
-        }
-        updateTopSource();
-      }
-
-      function updateTopSource() {
-        let maxIp = "N/A";
-        let maxCount = 0;
-        for (const ip in ips) {
-          if (ips[ip] > maxCount) {
-            maxCount = ips[ip];
-            maxIp = ip;
-          }
-        }
-        document.getElementById("topSourceIP").innerText = maxIp;
-        document.getElementById("topSource").innerText = maxCount + " ataques";
-      }
-
-      function updateHealthStatus(health) {
-        const sensors = ["db", "nginx"];
-        sensors.forEach((s) => {
-          const data = health[s];
-          const card = document.getElementById(`${s}HealthCard`);
-          const dot = document.getElementById(`${s}Dot`);
-          const ping = document.getElementById(`${s}Ping`);
-          const statusText = document.getElementById(`${s}Status`);
-          const lastSeen = document.getElementById(`${s}LastSeen`);
-
-          if (data.status === "ONLINE") {
-            card.classList.replace("border-slate-200", "border-green-500");
-            dot.classList.replace("bg-slate-500", "bg-green-500");
-            ping.classList.replace("bg-slate-400", "bg-green-400");
-            ping.classList.add("animate-ping");
-            statusText.innerText = "ONLINE";
-            statusText.classList.add("text-green-600");
-            lastSeen.innerText = `Última señal: ${data.last_seen} (IP: ${data.ip})`;
-          } else {
-            card.classList.replace("border-green-500", "border-slate-200");
-            dot.classList.replace("bg-green-500", "bg-slate-500");
-            ping.classList.replace("bg-green-400", "bg-slate-400");
-            ping.classList.remove("animate-ping");
-            statusText.innerText = "OFFLINE";
-            statusText.classList.remove("text-green-600");
-          }
-        });
-      }
-
-      setInterval(async () => {
-        try {
-          const response = await fetch("/api/get-latest");
-          const data = await response.json();
-
-          // Procesar Logs
-          if (data.logs) data.logs.forEach((log) => addLog(log));
-
-          // Procesar Salud
-          if (data.health) updateHealthStatus(data.health);
-        } catch (e) {}
-      }, 1500);
-
-      // --- Gestión de Configuración ---
-      async function openConfig() {
-        const response = await fetch("/api/config");
-        const config = await response.json();
-
-        document.getElementById("dbIpInput").value = config.db_ip;
-        document.getElementById("nginxIpInput").value = config.nginx_ip;
-        document.getElementById("lastUpdateText").innerText =
-          config.last_update;
-
-        document.getElementById("configModal").classList.remove("hidden");
-      }
-
-      function closeConfig() {
-        document.getElementById("configModal").classList.add("hidden");
-      }
-
-      async function saveConfig() {
-        const db_ip = document.getElementById("dbIpInput").value;
-        const nginx_ip = document.getElementById("nginxIpInput").value;
-
-        const response = await fetch("/api/config", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ db_ip, nginx_ip }),
-        });
-
-        if (response.ok) {
-          alert("Configuración guardada correctamente");
-          closeConfig();
-        }
-      }
-    </script>
-    <!-- Modal de Configuración -->
+    <!-- Modal: Network Map -->
     <div
-      id="configModal"
-      class="hidden fixed inset-0 z-[100] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4"
+      id="networkModal"
+      class="hidden fixed inset-0 z-[110] bg-slate-900/80 backdrop-blur-md flex items-center justify-center p-4"
     >
       <div
-        class="shadcn-card w-full max-w-md bg-white shadow-2xl animate-in fade-in zoom-in duration-200"
+        class="shadcn-card w-full max-w-5xl bg-white shadow-2xl h-[80vh] flex flex-col overflow-hidden"
       >
         <div class="p-6 border-b flex items-center justify-between">
-          <h2 class="text-lg font-bold">Infraestructura</h2>
+          <div class="flex items-center gap-2">
+            <i data-lucide="network" class="text-blue-600"></i>
+            <h2 class="text-lg font-bold">Topología en Tiempo Real</h2>
+          </div>
           <button
-            onclick="closeConfig()"
+            onclick="closeNetworkMap()"
             class="text-slate-400 hover:text-slate-600"
           >
-            <i data-lucide="x" class="h-5 w-5"></i>
+            <i data-lucide="x" class="h-6 w-6"></i>
           </button>
         </div>
-        <div class="p-6 space-y-4">
-          <div class="space-y-2">
-            <label class="text-sm font-medium leading-none"
-              >IP Base de Datos (MySQL)</label
+        <div class="flex-1 p-8 relative bg-slate-50/50">
+          <!-- Main Node -->
+          <div
+            class="absolute top-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1"
+          >
+            <div
+              class="w-14 h-14 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-lg"
             >
-            <input
-              type="text"
-              id="dbIpInput"
-              class="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <div class="space-y-2">
-            <label class="text-sm font-medium leading-none"
-              >IP Nodo Borde (Nginx/Suricata)</label
+              <i data-lucide="shield-check" class="h-7 w-7"></i>
+            </div>
+            <span class="text-[10px] font-bold uppercase">Admin / Main</span>
+            <span
+              class="text-[9px] font-mono bg-blue-50 px-2 rounded text-blue-600"
+              id="mapMainIp"
+              >---</span
             >
-            <input
-              type="text"
-              id="nginxIpInput"
-              class="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
           </div>
-          <p class="text-[10px] text-slate-400">
-            Última actualización: <span id="lastUpdateText">N/A</span>
-          </p>
+          <!-- Nginx Node -->
+          <div
+            class="absolute top-1/2 left-20 -translate-y-1/2 flex flex-col items-center gap-1"
+          >
+            <div
+              id="nodeNginx"
+              class="w-16 h-16 bg-white border-2 rounded-full flex items-center justify-center shadow-md transition-all duration-500"
+            >
+              <i data-lucide="server" class="h-8 w-8 text-slate-400"></i>
+            </div>
+            <span class="text-[10px] font-bold uppercase">Nginx Server</span>
+            <span
+              class="text-[9px] font-mono border px-2 rounded"
+              id="mapNginxIp"
+              >---</span
+            >
+            <div
+              id="statusNginx"
+              class="text-[8px] font-bold px-2 rounded bg-slate-400 text-white uppercase"
+            >
+              Offline
+            </div>
+          </div>
+          <!-- MySQL Node -->
+          <div
+            class="absolute top-1/2 right-20 -translate-y-1/2 flex flex-col items-center gap-1"
+          >
+            <div
+              id="nodeDb"
+              class="w-16 h-16 bg-white border-2 rounded-full flex items-center justify-center shadow-md transition-all duration-500"
+            >
+              <i data-lucide="database" class="h-8 w-8 text-slate-400"></i>
+            </div>
+            <span class="text-[10px] font-bold uppercase">MySQL Database</span>
+            <span class="text-[9px] font-mono border px-2 rounded" id="mapDbIp"
+              >---</span
+            >
+            <div
+              id="statusDb"
+              class="text-[8px] font-bold px-2 rounded bg-slate-400 text-white uppercase"
+            >
+              Offline
+            </div>
+          </div>
+          <!-- Clients Container -->
+          <div
+            class="absolute bottom-10 left-10 right-10 flex justify-center gap-6"
+            id="clientsMapContainer"
+          ></div>
+          <!-- Firewall (Center) -->
+          <div
+            class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center"
+          >
+            <div
+              class="w-10 h-14 bg-red-600 rounded flex items-center justify-center text-white shadow-md border-2 border-white"
+            >
+              <i data-lucide="flame" class="h-5 w-5 animate-pulse"></i>
+            </div>
+            <span class="text-[8px] font-bold text-red-600 mt-1"
+              >FIREWALL ACTIVE</span
+            >
+          </div>
         </div>
-        <div class="p-6 border-t flex justify-end gap-3">
+        <div
+          class="p-4 border-t bg-slate-50 flex justify-between items-center text-[10px] text-slate-400"
+        >
+          <span>ESCANEANDO PUNTOS DE ACCESO...</span>
+          <span class="text-red-500 font-bold" id="bannedCountSummary"
+            >0 BANEOS</span
+          >
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: Config -->
+    <div
+      id="configModal"
+      class="hidden fixed inset-0 z-[120] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4"
+    >
+      <div
+        class="shadcn-card w-full max-w-sm bg-white p-6 space-y-4 animate-in zoom-in duration-200"
+      >
+        <h2 class="text-lg font-bold">Configuración de IPs</h2>
+        <div class="space-y-3 font-mono">
+          <div>
+            <label class="text-[10px] text-slate-500">IP WEB (NGINX)</label
+            ><input
+              id="nginxIpInput"
+              class="w-full h-10 border rounded px-3 text-sm focus:ring-2 ring-blue-500/20"
+            />
+          </div>
+          <div>
+            <label class="text-[10px] text-slate-500">IP DATABASE (MYSQL)</label
+            ><input
+              id="dbIpInput"
+              class="w-full h-10 border rounded px-3 text-sm focus:ring-2 ring-blue-500/20"
+            />
+          </div>
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
           <button
             onclick="closeConfig()"
-            class="px-4 py-2 border rounded-md text-sm font-medium hover:bg-slate-50"
+            class="px-4 py-2 text-xs font-medium border rounded hover:bg-slate-50"
           >
             Cancelar
           </button>
           <button
             onclick="saveConfig()"
-            class="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700"
+            class="px-4 py-2 text-xs font-medium bg-blue-600 text-white rounded hover:bg-blue-700"
           >
-            Guardar Cambios
+            Guardar
           </button>
         </div>
       </div>
     </div>
+
+    <script>
+      lucide.createIcons();
+      let counts = { sqli: 0, http: 0 };
+      const ips = {};
+      let cachedHealth = {};
+      let bannedList = [];
+
+      async function openNetworkMap() {
+        document.getElementById("networkModal").classList.remove("hidden");
+        updateMapVisuals();
+        lucide.createIcons();
+      }
+      function closeNetworkMap() {
+        document.getElementById("networkModal").classList.add("hidden");
+      }
+
+      async function banPerson(ip) {
+        if (!confirm(`Bloquear IP ${ip}?`)) return;
+        try {
+          const res = await fetch("/api/ban", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ip }),
+          });
+          const r = await res.json();
+          alert(r.message);
+        } catch (e) {
+          alert("Error");
+        }
+      }
+
+      function addLog(data) {
+        const time = new Date().toLocaleTimeString();
+        const src_ip = data.src_ip || data.sensor_source || "N/A";
+        ips[src_ip] = (ips[src_ip] || 0) + 1;
+
+        if (data.event_type === "alert") {
+          document.getElementById("noDbLogs")?.remove();
+          counts.sqli++;
+          document.getElementById("sqliCount").innerText = counts.sqli;
+          const row = document.createElement("tr");
+          row.className =
+            "border-b bg-red-50/20 hover:bg-red-50 transition-colors";
+          row.innerHTML = `<td class="p-3 font-mono text-[10px]">${time}</td><td class="p-3"><div class="font-bold text-red-700 text-[10px]">${data.alert.signature}</div></td><td class="p-3 font-mono text-[10px] text-slate-600">${src_ip}</td><td class="p-3"><button onclick="banPerson('${src_ip}')" class="px-2 py-0.5 bg-red-600 text-white text-[9px] rounded font-bold">BAN</button></td>`;
+          document.getElementById("dbTableBody").prepend(row);
+        } else {
+          document.getElementById("noNginxLogs")?.remove();
+          counts.http++;
+          document.getElementById("httpCount").innerText = counts.http;
+          const row = document.createElement("tr");
+          row.className = "border-b hover:bg-slate-50 transition-colors";
+          row.innerHTML = `<td class="p-3 font-mono text-[10px]">${time}</td><td class="p-3"><span class="px-1.5 py-0.5 bg-slate-100 rounded text-[9px] font-bold">${
+            data.http?.http_method || "GET"
+          }</span></td><td class="p-3 text-[10px] text-slate-600 truncate max-w-[150px]">${
+            data.http?.url || data.nginx_msg || "/"
+          }</td><td class="p-3"><button onclick="banPerson('${src_ip}')" class="px-2 py-0.5 border border-red-200 text-red-600 text-[9px] rounded font-bold">BAN</button></td>`;
+          document.getElementById("nginxTableBody").prepend(row);
+        }
+        if (
+          !document.getElementById("networkModal").classList.contains("hidden")
+        )
+          updateMapVisuals();
+      }
+
+      function updateHealth(health) {
+        cachedHealth = health;
+        ["db", "nginx"].forEach((s) => {
+          const d = health[s];
+          const card = document.getElementById(`${s}HealthCard`);
+          const dot = document.getElementById(`${s}Dot`);
+          const ping = document.getElementById(`${s}Ping`);
+          const sTxt = document.getElementById(`${s}Status`);
+          const time = document.getElementById(`${s}LastSeen`);
+
+          if (d.status === "ONLINE") {
+            card.style.borderColor = "#22c55e";
+            sTxt.innerText = "ONLINE";
+            sTxt.style.color = "#16a34a";
+            dot.className =
+              "relative inline-flex rounded-full h-3 w-3 bg-green-500";
+            ping.className =
+              "absolute inline-flex h-full w-full rounded-full bg-green-400 animate-ping opacity-75";
+            time.innerText = `IP: ${d.ip} | ${d.last_seen}`;
+          } else {
+            card.style.borderColor = "#e2e8f0";
+            sTxt.innerText = "OFFLINE";
+            sTxt.style.color = "#64748b";
+            dot.className =
+              "relative inline-flex rounded-full h-3 w-3 bg-slate-500";
+            ping.className =
+              "absolute inline-flex h-full w-full rounded-full bg-slate-400 opacity-0";
+          }
+        });
+      }
+
+      function updateMapVisuals() {
+        const cfg = window.cfg || {};
+        const mainIpEl = document.getElementById("mapMainIp");
+        const nginxIpEl = document.getElementById("mapNginxIp");
+        const dbIpEl = document.getElementById("mapDbIp");
+
+        if (mainIpEl) mainIpEl.innerText = location.hostname;
+        if (nginxIpEl) nginxIpEl.innerText = cfg.nginx_ip || "---";
+        if (dbIpEl) dbIpEl.innerText = cfg.db_ip || "---";
+
+        const applyNode = (id, statId, isOk) => {
+          const el = document.getElementById(id);
+          const s = document.getElementById(statId);
+          if (!el || !s) return;
+
+          const icon = el.querySelector("i, svg");
+          if (isOk) {
+            el.classList.add("border-green-500", "node-active");
+            el.classList.remove("border-slate-300");
+            if (icon) {
+              icon.classList.remove("text-slate-400");
+              icon.classList.add("text-green-600");
+            }
+            s.innerText = "ONLINE";
+            s.className =
+              "text-[8px] font-bold px-2 rounded bg-green-500 text-white uppercase";
+          } else {
+            el.classList.remove("border-green-500", "node-active");
+            el.classList.add("border-slate-300");
+            if (icon) {
+              icon.classList.remove("text-green-600");
+              icon.classList.add("text-slate-400");
+            }
+            s.innerText = "OFFLINE";
+            s.className =
+              "text-[8px] font-bold px-2 rounded bg-slate-400 text-white uppercase";
+          }
+        };
+
+        applyNode(
+          "nodeNginx",
+          "statusNginx",
+          cachedHealth.nginx?.status === "ONLINE"
+        );
+        applyNode("nodeDb", "statusDb", cachedHealth.db?.status === "ONLINE");
+
+        const contain = document.getElementById("clientsMapContainer");
+        if (contain) {
+          contain.innerHTML = "";
+          const recent = Object.keys(ips).slice(-6);
+          if (!recent.length) {
+            contain.innerHTML =
+              "<span class='text-[10px] text-slate-300 italic'>Sin tráfico externo</span>";
+          } else {
+            recent.forEach((ip) => {
+              const banned = bannedList.includes(ip);
+              const d = document.createElement("div");
+              d.className = "flex flex-col items-center gap-1 scale-90";
+              d.innerHTML = `<div class="w-10 h-10 ${
+                banned ? "bg-red-600" : "bg-white border-2"
+              } rounded-lg flex items-center justify-center shadow-sm"><i data-lucide="monitor" class="h-5 w-5 ${
+                banned ? "text-white" : "text-slate-300"
+              }"></i></div><span class="text-[8px] font-mono ${
+                banned ? "text-red-600 font-bold" : "text-slate-400"
+              }">${ip}</span>`;
+              contain.appendChild(d);
+            });
+          }
+        }
+
+        const bannedSummary = document.getElementById("bannedCountSummary");
+        if (bannedSummary)
+          bannedSummary.innerText = `${bannedList.length} BANEOS ACTIVOS`;
+        lucide.createIcons();
+      }
+
+      setInterval(async () => {
+        try {
+          const res = await fetch("/api/get-latest");
+          const d = await res.json();
+          bannedList = d.banned || [];
+          if (d.logs) d.logs.forEach((l) => addLog(l));
+          if (d.health) updateHealth(d.health);
+        } catch (e) {}
+      }, 1500);
+
+      async function openConfig() {
+        const res = await fetch("/api/config");
+        window.cfg = await res.json();
+        document.getElementById("nginxIpInput").value = window.cfg.nginx_ip;
+        document.getElementById("dbIpInput").value = window.cfg.db_ip;
+        document.getElementById("configModal").classList.remove("hidden");
+      }
+      function closeConfig() {
+        document.getElementById("configModal").classList.add("hidden");
+      }
+      async function saveConfig() {
+        const nginx_ip = document.getElementById("nginxIpInput").value;
+        const db_ip = document.getElementById("dbIpInput").value;
+        await fetch("/api/config", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ nginx_ip, db_ip }),
+        });
+        window.cfg = { nginx_ip, db_ip };
+        closeConfig();
+      }
+    </script>
   </body>
 </html>
