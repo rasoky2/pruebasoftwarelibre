@@ -25,6 +25,7 @@ $dbname = $env['DB_NAME'] ?? 'lab_vulnerable';
 $user = $env['DB_USER'] ?? 'root';
 $pass = $env['DB_PASS'] ?? '';
 
+$db_connection_error = null;
 try {
     // Conexión a MySQL usando PDO
     $dsn = "mysql:host=$host;dbname=$dbname;charset=utf8mb4";
@@ -36,6 +37,6 @@ try {
     $db->setAttribute(PDO::ATTR_EMULATE_PREPARES, true); 
 
 } catch (PDOException $e) {
-    die("Error de conexión a la base de datos: " . $e->getMessage());
+    $db_connection_error = "MySQL Off-line: " . $e->getMessage();
 }
 ?>

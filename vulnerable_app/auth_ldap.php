@@ -4,37 +4,41 @@
  * Propósito: Módulo de autenticación LDAP (Integración Proyecto Agustín)
  */
 
+$ldap_connection_error = null;
+
 function autenticar_con_ldap($usuario, $password) {
-    // 1. Datos del Servidor LDAP (Agustín)
+    global $ldap_connection_error;
+    
+    // 1. Datos del Servidor LDAP (Configurables)
     $ldap_host = "10.172.86.161"; 
     $ldap_port = 389;
     $ldap_dn_base = "ou=usuarios,dc=softwarelibre,dc=local";
 
     // 2. Conectar al servidor
-    $connect = ldap_connect($ldap_host, $ldap_port);
+    $connect = @ldap_connect($ldap_host, $ldap_port);
     
-    // Es vital usar la versión 3 para servidores modernos
+    if (!$connect) {
+        $ldap_connection_error = "Servidor LDAP inalcanzable.";
+        return false;
+    }
+
     ldap_set_option($connect, LDAP_OPT_PROTOCOL_VERSION, 3);
-    ldap_set_option($connect, LDAP_OPT_REFERRALS, 0);
+    ldap_set_option($connect, LDAP_OPT_NETWORK_TIMEOUT, 2);
 
     if ($connect) {
-        // 3. Formatear el DN del usuario según la estructura de Agustín
         $user_dn = "uid=" . $usuario . "," . $ldap_dn_base;
-
-        // 4. Intentar la vinculación (Login)
-        // Usamos @ para que PHP no muestre warnings si la clave está mal
         $bind = @ldap_bind($connect, $user_dn, $password);
 
         if ($bind) {
             ldap_close($connect);
             return true; 
         } else {
+            $ldap_connection_error = "Credenciales LDAP incorrectas o servidor rechazó conexión.";
             ldap_close($connect);
             return false;
         }
-    } else {
-        return false;
     }
+    return false;
 }
 
 // Logica de procesamiento si se accede directamente (opcional)
