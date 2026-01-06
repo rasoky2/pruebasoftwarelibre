@@ -87,6 +87,7 @@ def setup_nginx():
             print("\n[!] Error en la sintaxis de Nginx. Revise la consola.")
 
         os.remove("nginx_temp.conf")
+        
 
     except Exception as e:
         print(f"[!] Error: {e}")
