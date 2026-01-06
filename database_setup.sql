@@ -1,6 +1,6 @@
--- Script de creación de base de datos para el Servidor MySQL (192.168.1.57)
-
-CREATE DATABASE IF NOT EXISTS lab_vulnerable;
+-- Script de creación de base de datos para el Servidor MySQL
+DROP DATABASE IF EXISTS lab_vulnerable;
+CREATE DATABASE lab_vulnerable;
 USE lab_vulnerable;
 
 -- Tabla de Usuarios (Vulnerable a SQLi)
