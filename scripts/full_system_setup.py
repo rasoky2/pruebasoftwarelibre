@@ -70,6 +70,7 @@ def configure_netplan():
         print("[OK] Red configurada.")
         if os.path.exists("temp_netplan.yaml"): os.remove("temp_netplan.yaml")
     except Exception as e: print(f"[!] Error en Netplan: {e}")
+def main():
     if os.geteuid() != 0:
         print("[!] Este script requiere privilegios de superusuario (sudo).")
         sys.exit(1)
@@ -93,29 +94,31 @@ def configure_netplan():
 
     # 4. Infraestructura
     print("\n--- Configuración de Servicios ---")
-    db_ip = input("IP de la Base de Datos [10.172.86.69]: ") or "10.172.86.69"
+    local_ip = get_local_ip()
+    db_ip = input("IP de la Base de Datos [127.0.0.1]: ") or "127.0.0.1"
     db_user = "webuser"
     db_pass = "web123"
     
-    central_server_ip = input(f"IP del Servidor Central (Dashboard + LDAP) [{get_local_ip()}]: ") or get_local_ip()
+    central_server_ip = input(f"IP del Servidor Central (Dashboard + LDAP) [{local_ip}]: ") or local_ip
     ldap_server_ip = central_server_ip
     main_server_ip = central_server_ip
 
     # 5. Actualizar config.php
     updates = {
         "DB_HOST": db_ip,
+        "DB_NAME": "lab_vulnerable",
         "DB_USER": db_user,
         "DB_PASS": db_pass,
         "MAIN_SERVER_IP": main_server_ip,
         "LDAP_HOST": ldap_server_ip,
-        "SURICATA_SENSOR_IP": get_local_ip()
+        "SURICATA_SENSOR_IP": local_ip
     }
     
     from setup_inventory import update_config_php
     update_config_php(updates)
 
     # 6. Actualizar auth_ldap.php
-    ldap_php_path = os.path.join(os.path.dirname(__file__), "..", "vulnerable_app", "auth_ldap.php")
+    ldap_php_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "vulnerable_app", "auth_ldap.php"))
     if os.path.exists(ldap_php_path):
         print(f"[*] Sincronizando IP LDAP en auth_ldap.php...")
         with open(ldap_php_path, "r") as f:
@@ -128,11 +131,14 @@ def configure_netplan():
     for file_to_del in ["../.env", "configuration.json"]:
         path_del = os.path.abspath(os.path.join(os.path.dirname(__file__), file_to_del))
         if os.path.exists(path_del):
-            os.remove(path_del)
-            print(f"[-] Archivo eliminado por limpieza: {file_to_del}")
+            try:
+                os.remove(path_del)
+                print(f"[-] Archivo eliminado por limpieza: {file_to_del}")
+            except: pass
 
     print("\n" + "="*50)
     print("   ¡SISTEMA CONFIGURADO Y SINCRONIZADO!")
+    print("   Usa setup_nginx.py o setup_db_mysql.py para servicios específicos.")
     print("="*50 + "\n")
 
 if __name__ == "__main__":
