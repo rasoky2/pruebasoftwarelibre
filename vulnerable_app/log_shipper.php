@@ -14,7 +14,7 @@ function ship_log($event_type, $message, $extra_data = []) {
         "event_type" => "app_event",
         "app_module" => $event_type,
         "message" => $message,
-        "src_ip" => $_SERVER['REMOTE_ADDR'] ?? 'unknown',
+        "src_ip" => $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['HTTP_X_REAL_IP'] ?? $_SERVER['REMOTE_ADDR'] ?? 'unknown',
         "user_agent" => $_SERVER['HTTP_USER_AGENT'] ?? 'unknown',
         "uri" => $_SERVER['REQUEST_URI'] ?? 'unknown'
     ];
