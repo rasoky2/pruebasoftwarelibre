@@ -134,6 +134,7 @@ def receive_suricata_log():
         # print(f"DEBUG: Heartbeat/Log desde {sensor_ip}")
 
         # Identificar el objetivo (db o nginx)
+        stype = data.get('sensor_type')
         target = 'db' if stype == 'database' else 'nginx'
 
         # Actualizar información base
