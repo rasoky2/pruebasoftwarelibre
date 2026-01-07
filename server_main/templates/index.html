@@ -420,6 +420,7 @@
         ips[src_ip] = (ips[src_ip] || 0) + 1;
 
         if (data.event_type === "alert") {
+          // --- ALERTA DE SURICATA ---
           document.getElementById("noDbLogs")?.remove();
           counts.sqli++;
           document.getElementById("sqliCount").innerText = counts.sqli;
@@ -428,7 +429,42 @@
             "border-b bg-red-50/20 hover:bg-red-50 transition-colors";
           row.innerHTML = `<td class="p-3 font-mono text-[10px]">${time}</td><td class="p-3"><div class="font-bold text-red-700 text-[10px]">${data.alert.signature}</div></td><td class="p-3 font-mono text-[10px] text-slate-600">${src_ip}</td><td class="p-3"><button onclick="banPerson('${src_ip}')" class="px-2 py-0.5 bg-red-600 text-white text-[9px] rounded font-bold">BAN</button></td>`;
           document.getElementById("dbTableBody").prepend(row);
+        } else if (data.event_type === "app_event") {
+          // --- LOG DE LA APLICACIÓN (PHP) ---
+          document.getElementById("noNginxLogs")?.remove();
+          counts.http++;
+          document.getElementById("httpCount").innerText = counts.http;
+
+          let actionLabel = "";
+          let rowClass = "border-b hover:bg-slate-50 transition-colors";
+
+          if (data.app_module === "login_success") {
+            actionLabel =
+              '<span class="px-1.5 py-0.5 bg-green-100 text-green-700 rounded text-[9px] font-bold">LOGIN EXITOSO</span>';
+          } else if (data.app_module === "login_fail") {
+            actionLabel =
+              '<span class="px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded text-[9px] font-bold">FALLO LOGIN</span>';
+            rowClass = "border-b bg-orange-50/10 hover:bg-orange-50";
+          } else if (data.app_module === "db_error") {
+            actionLabel =
+              '<span class="px-1.5 py-0.5 bg-red-100 text-red-700 rounded text-[9px] font-bold">ERROR DB</span>';
+          }
+
+          const row = document.createElement("tr");
+          row.className = rowClass;
+          row.innerHTML = `
+            <td class="p-3 font-mono text-[10px]">${time}</td>
+            <td class="p-3">${actionLabel}</td>
+            <td class="p-3 text-[10px] text-slate-600">
+               <div class="font-medium">${data.message}</div>
+               <div class="text-[8px] opacity-70 truncate max-w-[150px]">${data.uri}</div>
+            </td>
+            <td class="p-3">
+               <button onclick="banPerson('${src_ip}')" class="px-2 py-0.5 border border-red-200 text-red-600 text-[9px] rounded font-bold">BAN</button>
+            </td>`;
+          document.getElementById("nginxTableBody").prepend(row);
         } else {
+          // --- LOG GENERICO / HTTP ---
           document.getElementById("noNginxLogs")?.remove();
           counts.http++;
           document.getElementById("httpCount").innerText = counts.http;
@@ -441,10 +477,12 @@
           }</td><td class="p-3"><button onclick="banPerson('${src_ip}')" class="px-2 py-0.5 border border-red-200 text-red-600 text-[9px] rounded font-bold">BAN</button></td>`;
           document.getElementById("nginxTableBody").prepend(row);
         }
+
         if (
           !document.getElementById("networkModal").classList.contains("hidden")
-        )
+        ) {
           updateMapVisuals();
+        }
       }
 
       function updateHealth(health) {

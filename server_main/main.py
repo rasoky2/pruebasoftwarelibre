@@ -134,20 +134,31 @@ def receive_suricata_log():
         # print(f"DEBUG: Heartbeat/Log desde {sensor_ip}")
 
         # Identificar y Actualizar Salud del Sensor
-        # Comparamos quitando posibles espacios
-        target_db = current_config['db_ip'].strip()
-        target_nginx = current_config['nginx_ip'].strip()
-
-        if sensor_ip == target_db:
+        # Prioridad 1: Por el campo 'sensor_type' si existe
+        stype = data.get('sensor_type')
+        if stype == 'database':
             sensors_health['db']['status'] = "ONLINE"
             sensors_health['db']['last_seen'] = datetime.now().strftime('%H:%M:%S')
             sensors_health['db']['ip'] = sensor_ip
-        elif sensor_ip == target_nginx:
+        elif stype == 'nginx' or data.get('event_type') == 'alert':
             sensors_health['nginx']['status'] = "ONLINE"
             sensors_health['nginx']['last_seen'] = datetime.now().strftime('%H:%M:%S')
             sensors_health['nginx']['ip'] = sensor_ip
+        else:
+            # Prioridad 2: Por IP configurada (Fallback)
+            target_db = current_config['db_ip'].strip()
+            target_nginx = current_config['nginx_ip'].strip()
 
-        # Si es un log de Suricata, lo guardamos
+            if sensor_ip == target_db:
+                sensors_health['db']['status'] = "ONLINE"
+                sensors_health['db']['last_seen'] = datetime.now().strftime('%H:%M:%S')
+                sensors_health['db']['ip'] = sensor_ip
+            elif sensor_ip == target_nginx:
+                sensors_health['nginx']['status'] = "ONLINE"
+                sensors_health['nginx']['last_seen'] = datetime.now().strftime('%H:%M:%S')
+                sensors_health['nginx']['ip'] = sensor_ip
+
+        # Guardar el log si tiene tipo de evento
         if data.get('event_type'):
             logs_storage.append(data)
             if data.get('event_type') == 'alert':
