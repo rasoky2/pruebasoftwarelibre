@@ -216,9 +216,14 @@ def setup_db_config():
         "DB_PASS": db_pass
     })
     
-    # 7. Instalación del Servicio Heartbeat (Persistencia)
-    if input("\n¿Desea instalar el servicio de latido (Heartbeat) para el Dashboard? (s/N): ").lower() == 's':
+    # 7. Instalación del Servicio Heartbeat (Python)
+    if input("\n¿Desea instalar/actualizar el servicio de latido (Heartbeat) para el Dashboard? (s/N): ").lower() == 's':
         print("[*] Configurando servicio db-heartbeat...")
+        
+        # Instalar dependencia para métricas de sistema (CPU/RAM)
+        subprocess.run(["sudo", "apt", "update"], check=False)
+        subprocess.run(["sudo", "apt", "install", "-y", "python3-psutil"], check=False)
+        
         service_src = os.path.join(os.path.dirname(os.path.dirname(__file__)), "mysql", "db-heartbeat.service")
         service_dst = "/etc/systemd/system/db-heartbeat.service"
         
@@ -228,7 +233,7 @@ def setup_db_config():
                 subprocess.run(["sudo", "systemctl", "daemon-reload"], check=True)
                 subprocess.run(["sudo", "systemctl", "enable", "db-heartbeat"], check=True)
                 subprocess.run(["sudo", "systemctl", "restart", "db-heartbeat"], check=True)
-                print("[OK] Servicio db-heartbeat instalado y activo.")
+                print("[OK] Servicio db-heartbeat configurado y REINICIADO.")
             except Exception as e:
                 print(f"[!] Error instalando servicio: {e}")
         else:

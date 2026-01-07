@@ -205,7 +205,6 @@ def setup_nginx():
         if os.path.exists("nginx_temp.conf"): os.remove("nginx_temp.conf")
 
         # Configuración de Seguridad (Suricata)
-        main_server_ip = input(f"IP Servidor Main (Dashboard) [{local_ip}]: ") or local_ip
         if input("\n¿Desea instalar y configurar Suricata IDS en este nodo? (s/N): ").lower() == 's':
             install_suricata()
             configure_suricata(main_server_ip)
@@ -217,35 +216,29 @@ def setup_nginx():
             })
             print("[OK] Suricata y .env configurados.")
             
-            # Instalar el servicio log-shipper automáticamente
-            print("\n[*] Configurando Log Shipper para enviar alertas al Dashboard...")
+            # --- NUEVA AUTOMATIZACIÓN: LOG SHIPPER PYTHON ---
+            print("\n[*] Configurando Log Shipper (Python) para alertas Suricata...")
+            
+            # Instalar dependencia para métricas de sistema (CPU/RAM)
+            subprocess.run(["sudo", "apt", "update"], check=False)
+            subprocess.run(["sudo", "apt", "install", "-y", "python3-psutil"], check=False)
+            
+            shipper_py = os.path.join(os.path.dirname(os.path.dirname(__file__)), "suricata", "log_shipper.py")
             shipper_service_src = os.path.join(os.path.dirname(os.path.dirname(__file__)), "suricata", "log-shipper.service")
             shipper_service_dst = "/etc/systemd/system/log-shipper.service"
             
             if os.path.exists(shipper_service_src):
                 try:
+                    # Copiar y activar servicio
                     subprocess.run(["sudo", "cp", shipper_service_src, shipper_service_dst], check=True)
                     subprocess.run(["sudo", "systemctl", "daemon-reload"], check=True)
                     subprocess.run(["sudo", "systemctl", "enable", "log-shipper"], check=True)
-                    subprocess.run(["sudo", "systemctl", "start", "log-shipper"], check=True)
-                    print(f"[OK] Log Shipper instalado y activo (enviando a {main_server_ip}:5000)")
-                    
-                    # Verificar estado
-                    result = subprocess.run(["systemctl", "is-active", "log-shipper"], 
-                                          capture_output=True, text=True)
-                    if result.stdout.strip() == "active":
-                        print("[OK] Servicio log-shipper verificado: ACTIVO")
-                    else:
-                        print("[!] Advertencia: El servicio log-shipper no está activo")
-                        print("    Ejecuta: sudo journalctl -u log-shipper -n 50")
+                    subprocess.run(["sudo", "systemctl", "restart", "log-shipper"], check=True)
+                    print(f"[OK] Servicio Log Shipper (Python) REINICIADO y enviando a {main_server_ip}")
                 except Exception as e:
-                    print(f"[!] Error instalando log-shipper: {e}")
-                    print("    Puedes instalarlo manualmente con:")
-                    print(f"    sudo cp {shipper_service_src} {shipper_service_dst}")
-                    print("    sudo systemctl daemon-reload && sudo systemctl enable --now log-shipper")
+                    print(f"[!] Error activando Log Shipper: {e}")
             else:
-                print(f"[!] No se encontró {shipper_service_src}")
-                print("    El log-shipper debe instalarse manualmente.")
+                print(f"[!] No se encontró el archivo de servicio: {shipper_service_src}")
 
 
         # 4. Actualización opcional de DB (config.php)

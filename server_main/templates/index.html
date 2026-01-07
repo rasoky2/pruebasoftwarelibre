@@ -95,6 +95,48 @@
           <p class="text-[10px] text-slate-400 mt-1" id="dbLastSeen">
             Esperando señal...
           </p>
+          <!-- Métricas de Sistema -->
+          <div
+            id="dbMetrics"
+            class="mt-4 hidden animate-in fade-in slide-in-from-top-1"
+          >
+            <div class="flex flex-col gap-2">
+              <div class="w-full">
+                <div
+                  class="flex justify-between text-[9px] font-bold text-slate-500 mb-1 uppercase"
+                >
+                  <span>CPU</span>
+                  <span id="dbCpuVal">0%</span>
+                </div>
+                <div
+                  class="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden"
+                >
+                  <div
+                    id="dbCpuBar"
+                    class="h-full bg-blue-500 transition-all duration-500"
+                    style="width: 0%"
+                  ></div>
+                </div>
+              </div>
+              <div class="w-full">
+                <div
+                  class="flex justify-between text-[9px] font-bold text-slate-500 mb-1 uppercase"
+                >
+                  <span>RAM</span>
+                  <span id="dbRamVal">0%</span>
+                </div>
+                <div
+                  class="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden"
+                >
+                  <div
+                    id="dbRamBar"
+                    class="h-full bg-purple-500 transition-all duration-500"
+                    style="width: 0%"
+                  ></div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
         <!-- Nginx Health -->
         <div
@@ -120,6 +162,48 @@
           <p class="text-[10px] text-slate-400 mt-1" id="nginxLastSeen">
             Esperando señal...
           </p>
+          <!-- Métricas de Sistema -->
+          <div
+            id="nginxMetrics"
+            class="mt-4 hidden animate-in fade-in slide-in-from-top-1"
+          >
+            <div class="flex flex-col gap-2">
+              <div class="w-full">
+                <div
+                  class="flex justify-between text-[9px] font-bold text-slate-500 mb-1 uppercase"
+                >
+                  <span>CPU</span>
+                  <span id="nginxCpuVal">0%</span>
+                </div>
+                <div
+                  class="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden"
+                >
+                  <div
+                    id="nginxCpuBar"
+                    class="h-full bg-blue-500 transition-all duration-500"
+                    style="width: 0%"
+                  ></div>
+                </div>
+              </div>
+              <div class="w-full">
+                <div
+                  class="flex justify-between text-[9px] font-bold text-slate-500 mb-1 uppercase"
+                >
+                  <span>RAM</span>
+                  <span id="nginxRamVal">0%</span>
+                </div>
+                <div
+                  class="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden"
+                >
+                  <div
+                    id="nginxRamBar"
+                    class="h-full bg-purple-500 transition-all duration-500"
+                    style="width: 0%"
+                  ></div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
         <!-- Alerts -->
         <div class="shadcn-card p-6">
@@ -504,6 +588,31 @@
             ping.className =
               "absolute inline-flex h-full w-full rounded-full bg-green-400 animate-ping opacity-75";
             time.innerText = `IP: ${d.ip} | ${d.last_seen}`;
+
+            // Actualizar métricas si existen
+            if (d.metrics) {
+              document.getElementById(`${s}Metrics`).classList.remove("hidden");
+              document.getElementById(
+                `${s}CpuVal`
+              ).innerText = `${d.metrics.cpu}%`;
+              document.getElementById(
+                `${s}RamVal`
+              ).innerText = `${d.metrics.ram}%`;
+              document.getElementById(
+                `${s}CpuBar`
+              ).style.width = `${d.metrics.cpu}%`;
+              document.getElementById(
+                `${s}RamBar`
+              ).style.width = `${d.metrics.ram}%`;
+
+              // Cambiar colores si la carga es alta
+              document.getElementById(`${s}CpuBar`).className =
+                d.metrics.cpu > 80 ? "h-full bg-red-500" : "h-full bg-blue-500";
+              document.getElementById(`${s}RamBar`).className =
+                d.metrics.ram > 80
+                  ? "h-full bg-red-500"
+                  : "h-full bg-purple-500";
+            }
           } else {
             card.style.borderColor = "#e2e8f0";
             sTxt.innerText = "OFFLINE";
@@ -512,6 +621,7 @@
               "relative inline-flex rounded-full h-3 w-3 bg-slate-500";
             ping.className =
               "absolute inline-flex h-full w-full rounded-full bg-slate-400 opacity-0";
+            document.getElementById(`${s}Metrics`).classList.add("hidden");
           }
         });
       }

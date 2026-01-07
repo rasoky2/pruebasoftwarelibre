@@ -4,9 +4,9 @@ After=network.target suricata.service
 
 [Service]
 Type=simple
-User=www-data
-WorkingDirectory=/var/www/html/pruebasoftwarelibre/vulnerable_app
-ExecStart=/usr/bin/php /var/www/html/pruebasoftwarelibre/vulnerable_app/log_shipper.php
+User=root
+WorkingDirectory=/var/www/html/pruebasoftwarelibre/suricata
+ExecStart=/usr/bin/python3 /var/www/html/pruebasoftwarelibre/suricata/log_shipper.py
 Restart=always
 RestartSec=10
 

@@ -136,27 +136,41 @@ def receive_suricata_log():
         # Identificar y Actualizar Salud del Sensor
         # Prioridad 1: Por el campo 'sensor_type' si existe
         stype = data.get('sensor_type')
+        metrics = data.get('metrics', {"cpu": 0, "ram": 0})
+
         if stype == 'database':
-            sensors_health['db']['status'] = "ONLINE"
-            sensors_health['db']['last_seen'] = datetime.now().strftime('%H:%M:%S')
-            sensors_health['db']['ip'] = sensor_ip
+            sensors_health['db'].update({
+                'status': "ONLINE",
+                'last_seen': datetime.now().strftime('%H:%M:%S'),
+                'ip': sensor_ip,
+                'metrics': metrics
+            })
         elif stype == 'nginx' or data.get('event_type') == 'alert':
-            sensors_health['nginx']['status'] = "ONLINE"
-            sensors_health['nginx']['last_seen'] = datetime.now().strftime('%H:%M:%S')
-            sensors_health['nginx']['ip'] = sensor_ip
+            sensors_health['nginx'].update({
+                'status': "ONLINE",
+                'last_seen': datetime.now().strftime('%H:%M:%S'),
+                'ip': sensor_ip,
+                'metrics': metrics
+            })
         else:
             # Prioridad 2: Por IP configurada (Fallback)
             target_db = current_config['db_ip'].strip()
             target_nginx = current_config['nginx_ip'].strip()
 
             if sensor_ip == target_db:
-                sensors_health['db']['status'] = "ONLINE"
-                sensors_health['db']['last_seen'] = datetime.now().strftime('%H:%M:%S')
-                sensors_health['db']['ip'] = sensor_ip
+                sensors_health['db'].update({
+                    'status': "ONLINE",
+                    'last_seen': datetime.now().strftime('%H:%M:%S'),
+                    'ip': sensor_ip,
+                    'metrics': metrics
+                })
             elif sensor_ip == target_nginx:
-                sensors_health['nginx']['status'] = "ONLINE"
-                sensors_health['nginx']['last_seen'] = datetime.now().strftime('%H:%M:%S')
-                sensors_health['nginx']['ip'] = sensor_ip
+                sensors_health['nginx'].update({
+                    'status': "ONLINE",
+                    'last_seen': datetime.now().strftime('%H:%M:%S'),
+                    'ip': sensor_ip,
+                    'metrics': metrics
+                })
 
         # Guardar el log si tiene tipo de evento
         if data.get('event_type'):
