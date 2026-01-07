@@ -47,8 +47,8 @@ $result = $conn->query($sql);
     <style>
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #fafafa;
-            color: #171717;
+            background-color: #f8fafc;
+            color: #0f172a;
         }
         .search-container {
             background: white;

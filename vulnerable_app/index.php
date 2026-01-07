@@ -78,7 +78,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         
         body { 
             font-family: 'Inter', sans-serif; 
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background-color: #f8fafc; /* Slate-50 */
+            color: #0f172a; /* Slate-900 */
             min-height: 100vh;
             display: flex;
             align-items: center;
@@ -89,48 +90,48 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         .shadcn-card { 
             background-color: #ffffff; 
             border: 1px solid #e2e8f0; 
-            color: #1e293b;
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            color: #0f172a;
+            box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
         }
         
         .shadcn-input { 
-            background-color: #f8fafc; 
-            border: 1px solid #cbd5e1; 
-            color: #1e293b; 
+            background-color: #ffffff; 
+            border: 1px solid #e2e8f0; 
+            color: #0f172a; 
         }
         
         .shadcn-input:focus { 
-            border-color: #667eea; 
+            border-color: #0f172a; 
             outline: none; 
-            background-color: #ffffff;
+            ring: 2px solid #e2e8f0;
         }
         
         .btn-primary { 
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background-color: #0f172a; /* Slate-900 */
             color: #ffffff; 
         }
         
         .btn-primary:hover { 
-            background: linear-gradient(135deg, #5568d3 0%, #6a3f8f 100%);
+            background-color: #1e293b; /* Slate-800 */
         }
         
         .btn-ldap { 
-            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            background-color: #2563eb; /* Blue-600 */
             color: #ffffff; 
         }
         
         .btn-ldap:hover { 
-            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+            background-color: #1d4ed8;
         }
         
         .tab-btn { 
-            color: #94a3b8; 
+            color: #64748b; /* Slate-500 */
             border-bottom: 2px solid transparent; 
         }
         
         .tab-active { 
-            color: #667eea; 
-            border-bottom: 2px solid #667eea; 
+            color: #0f172a; /* Slate-900 */
+            border-bottom: 2px solid #0f172a; 
         }
         
         .container-center {
