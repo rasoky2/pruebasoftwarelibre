@@ -121,38 +121,30 @@ def configure_suricata(main_server_ip):
             # 1. Ajustar default-rule-path
             content = re.sub(r'default-rule-path:.*', 'default-rule-path: /etc/suricata/rules', content)
             
-            # --- CONFIGURACIÓN SEGURA V2 (Append Only) ---
-            print("[DEBUG] Aplicando lógica de reescritura segura de rule-files...")
+            # --- CONFIGURACIÓN SEGURA V3 (Filtrado Agresivo) ---
+            print("[DEBUG] V3: Limpiando suricata.yaml por filtrado directo...")
             
             lines = content.splitlines()
             cleaned_lines = []
-            skipping = False
             
-            # 1. Eliminar cualquier bloque rule-files existente
+            # Filtro simple: Si la línea menciona 'rule-files' o termina en '.rules', la matamos.
+            # Esto es más seguro que intentar parsear indentaciones con regex en un archivo desconocido.
             for line in lines:
-                if re.match(r'^\s*rule-files:', line):
-                    skipping = True
+                if "rule-files:" in line:
                     continue
-                
-                if skipping:
-                    # Si la línea empieza con espacios o guión (lista), la saltamos
-                    if re.match(r'^\s+', line) or re.match(r'^\s*-', line):
-                        continue
-                    # Si encontramos una línea vacía o comentario, también saltamos para limpiar bien
-                    if re.match(r'^\s*$', line) or re.match(r'^\s*#', line):
-                        continue
-                    # Si llegamos aquí, es una nueva clave (ej: classification-file:)
-                    skipping = False
-                
+                if line.strip().endswith(".rules"):
+                    continue
+                if line.strip() == "-": # Posibles guiones huerfanos de listas
+                    continue
+                    
                 cleaned_lines.append(line)
 
-            # 2. Reconstruir contenido sin rule-files
+            # Reconstruir contenido
             content = "\n".join(cleaned_lines)
             
-            # 3. Añadir el bloque rule-files limpio y válido al final del archivo
-            # Esto evita cualquier problema de indentación anidada
+            # Añadir el bloque nuevo al final
             new_rules_block = f"""
-# --- Reglas añadidas por Setup Script ---
+# --- Reglas inyectadas por Setup Script ---
 rule-files:
   - {local_rules_dst}
   - suricata.rules
