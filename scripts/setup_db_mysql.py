@@ -207,16 +207,20 @@ def setup_db_config():
     # 6. Actualizar .env (ÚNICA FUENTE DE VERDAD)
     from setup_inventory import load_env, update_env
     env_data = load_env()
-    admin_ip = env_data.get("ADMIN_IP", "127.0.0.1")
+    
+    current_admin = env_data.get("ADMIN_IP", "127.0.0.1")
+    print(f"\n[*] Configuración de Red del Dashboard:")
+    admin_ip = input(f"   IP del Servidor Admin/Dashboard [{current_admin}]: ") or current_admin
 
     update_env({
+        "ADMIN_IP": admin_ip,
         "DB_IP": db_host,
         "DB_NAME": db_name,
         "DB_USER": db_user,
         "DB_PASS": db_pass,
         "SENSOR_TYPE": "database"
     })
-    print("[OK] Configuración de Base de Datos y SENSOR_TYPE actualizados.")
+    print("[OK] Configuración de Base de Datos y SENSOR_TYPE actualizados en .env")
     
     # 7. Configuración de Seguridad (Suricata en DB)
     print("\n" + "="*50)
