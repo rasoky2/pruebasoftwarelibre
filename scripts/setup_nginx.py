@@ -118,6 +118,21 @@ def configure_suricata(main_server_ip):
             if os.path.exists(suricata_yaml):
                 subprocess.run(["sudo", "cp", suricata_yaml, f"{suricata_yaml}.bak_setup"], check=False)
             
+            # Verificar existencia de archivos opcionales para no romper la config
+            included_rules = [os.path.basename(local_rules_dst)]
+            extra_rule = os.path.join(suricata_etc_dir, "rules", "suricata.rules")
+            if os.path.exists(extra_rule):
+                included_rules.append("suricata.rules")
+            
+            # Verificar configs auxiliares
+            class_conf = "/etc/suricata/classification.config"
+            ref_conf = "/etc/suricata/reference.config"
+            class_line = f"classification-file: {class_conf}" if os.path.exists(class_conf) else "# classification-file not found"
+            ref_line = f"reference-config-file: {ref_conf}" if os.path.exists(ref_conf) else "# reference-config-file not found"
+
+            # Generar bloque de reglas dinámico
+            rules_yaml_list = "\n".join([f"  - {r}" for r in included_rules])
+
             # Contenido YAML minimalista y garantizado de funcionar
             minimal_yaml = f"""%YAML 1.1
 ---
@@ -156,11 +171,10 @@ vars:
 default-rule-path: /etc/suricata/rules
 
 rule-files:
-  - {os.path.basename(local_rules_dst)}
-  - suricata.rules
+{rules_yaml_list}
 
-classification-file: /etc/suricata/classification.config
-reference-config-file: /etc/suricata/reference.config
+{class_line}
+{ref_line}
 
 outputs:
   - fast:
@@ -252,7 +266,8 @@ app-layer:
             else:
                 print(f"\n[!] ERROR CRÍTICO: La configuración generada de Suricata no es válida.")
                 print(f"    No se aplicaron cambios para evitar romper el servicio.")
-                print(f"    Detalle del error:\n{res_val.stderr}\n")
+                print(f"    STDOUT:\n{res_val.stdout}")
+                print(f"    STDERR:\n{res_val.stderr}\n")
                 
         except Exception as e:
             print(f"[!] Error editando/aplicando suricata.yaml: {e}")
