@@ -220,9 +220,13 @@ def setup_db_config():
     if input("\n¿Desea instalar/actualizar el servicio de latido (Heartbeat) para el Dashboard? (s/N): ").lower() == 's':
         print("[*] Configurando servicio db-heartbeat...")
         
-        # Instalar dependencia para métricas de sistema (CPU/RAM)
-        subprocess.run(["sudo", "apt", "update"], check=False)
-        subprocess.run(["sudo", "apt", "install", "-y", "python3-psutil"], check=False)
+        # Instalar dependencia para métricas de sistema (CPU/RAM) solo si no existe
+        if not check_package_installed("python3-psutil"):
+            print("[*] Instalando dependencias de monitoreo...")
+            subprocess.run(["sudo", "apt", "update"], check=False)
+            subprocess.run(["sudo", "apt", "install", "-y", "python3-psutil"], check=False)
+        else:
+            print("[OK] Dependencias de monitoreo ya presentes.")
         
         service_src = os.path.join(os.path.dirname(os.path.dirname(__file__)), "mysql", "db-heartbeat.service")
         service_dst = "/etc/systemd/system/db-heartbeat.service"

@@ -5,6 +5,8 @@ import os
 import subprocess
 import socket
 from dotenv import load_dotenv
+import psutil
+import threading
 
 def get_local_ip():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -17,13 +19,14 @@ def get_local_ip():
         s.close()
     return ip
 
-import psutil
-import threading
 
 def get_system_stats():
     """Obtiene métricas de CPU y Memoria"""
     try:
-        return {"cpu": psutil.cpu_percent(), "ram": psutil.virtual_memory().percent}
+        # psutil necesita un intervalo para calcular el cambio de CPU
+        cpu = psutil.cpu_percent(interval=0.5)
+        ram = psutil.virtual_memory().percent
+        return {"cpu": cpu, "ram": ram}
     except:
         return {"cpu": 0, "ram": 0}
 

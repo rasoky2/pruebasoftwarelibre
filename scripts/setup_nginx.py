@@ -220,9 +220,13 @@ def setup_nginx():
             # --- NUEVA AUTOMATIZACIÓN: LOG SHIPPER PYTHON ---
             print("\n[*] Configurando Log Shipper (Python) para alertas Suricata...")
             
-            # Instalar dependencia para métricas de sistema (CPU/RAM)
-            subprocess.run(["sudo", "apt", "update"], check=False)
-            subprocess.run(["sudo", "apt", "install", "-y", "python3-psutil"], check=False)
+            # Instalar dependencia para métricas de sistema (CPU/RAM) solo si no existe
+            if not check_package_installed("python3-psutil"):
+                print("[*] Instalando dependencias de monitoreo...")
+                subprocess.run(["sudo", "apt", "update"], check=False)
+                subprocess.run(["sudo", "apt", "install", "-y", "python3-psutil"], check=False)
+            else:
+                print("[OK] Dependencias de monitoreo ya presentes.")
             
             shipper_py = os.path.join(os.path.dirname(os.path.dirname(__file__)), "suricata", "log_shipper.py")
             shipper_service_src = os.path.join(os.path.dirname(os.path.dirname(__file__)), "suricata", "log-shipper.service")

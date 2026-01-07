@@ -508,10 +508,28 @@
           document.getElementById("noDbLogs")?.remove();
           counts.sqli++;
           document.getElementById("sqliCount").innerText = counts.sqli;
+
+          let badgeColor = "bg-red-100 text-red-700";
+          let badgeText = "ATAQUE";
+          const signature = data.alert?.signature || "Ataque detectado";
+
+          if (signature.includes("ICMP") || signature.includes("Ping")) {
+            badgeColor = "bg-blue-100 text-blue-700";
+            badgeText = "PING";
+          } else if (signature.includes("SSH")) {
+            badgeColor = "bg-purple-100 text-purple-700";
+            badgeText = "SSH";
+          } else if (signature.includes("Scan")) {
+            badgeColor = "bg-orange-100 text-orange-700";
+            badgeText = "SCAN";
+          }
+
+          const badge = `<span class="px-1.5 py-0.5 ${badgeColor} rounded text-[9px] font-bold uppercase">${badgeText}</span>`;
+
           const row = document.createElement("tr");
           row.className =
             "border-b bg-red-50/20 hover:bg-red-50 transition-colors";
-          row.innerHTML = `<td class="p-3 font-mono text-[10px]">${time}</td><td class="p-3"><div class="font-bold text-red-700 text-[10px]">${data.alert.signature}</div></td><td class="p-3 font-mono text-[10px] text-slate-600">${src_ip}</td><td class="p-3"><button onclick="banPerson('${src_ip}')" class="px-2 py-0.5 bg-red-600 text-white text-[9px] rounded font-bold">BAN</button></td>`;
+          row.innerHTML = `<td class="p-3 font-mono text-[10px]">${time}</td><td class="p-3">${badge}<div class="font-bold text-red-700 text-[10px] mt-1">${signature}</div></td><td class="p-3 font-mono text-[10px] text-slate-600">${src_ip}</td><td class="p-3"><button onclick="banPerson('${src_ip}')" class="px-2 py-0.5 bg-red-600 text-white text-[9px] rounded font-bold">BAN</button></td>`;
           document.getElementById("dbTableBody").prepend(row);
         } else if (data.event_type === "app_event") {
           // --- LOG DE LA APLICACIÓN (PHP) ---

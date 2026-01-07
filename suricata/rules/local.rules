@@ -11,3 +11,13 @@ alert http $EXTERNAL_NET any -> $HTTP_SERVERS any (msg:"POSSIBLE XSS Attack (scr
 # Detectar SQL Injection (UNION SELECT)
 alert http $EXTERNAL_NET any -> $HTTP_SERVERS any (msg:"POSSIBLE SQL Injection (UNION SELECT)"; flow:established,to_server; content:"UNION SELECT"; nocase; http_uri; classtype:web-application-attack; sid:1000005; rev:1;)
 alert http $EXTERNAL_NET any -> $HTTP_SERVERS any (msg:"POSSIBLE SQL Injection (UNION SELECT)"; flow:established,to_server; content:"UNION SELECT"; nocase; http_client_body; classtype:web-application-attack; sid:1000006; rev:1;)
+
+# --- DETECCIÓN DE RED Y ACCESO (100% SURICATA) ---
+# Detectar PING (ICMP) hacia el servidor
+alert icmp any any -> $HOME_NET any (msg:"ICMP Ping Detectado (Reconocimiento Red)"; itype:8; classtype:misc-activity; sid:1000007; rev:1;)
+
+# Detectar intentos de SSH (Acceso al puerto 22)
+alert tcp any any -> $HOME_NET 22 (msg:"INTENTO DE ACCESO SSH"; flow:to_server; flags:S; classtype:suspicious-login; sid:1000008; rev:1;)
+
+# Detectar escaneo de puertos (Nmap/SYN Scan)
+alert tcp any any -> $HOME_NET any (msg:"POSSIBLE Port Scan (SYN Flags)"; flags:S; threshold:type both, track by_src, count 20, seconds 10; classtype:attempted-recon; sid:1000009; rev:1;)
