@@ -202,7 +202,16 @@ def setup_db_config():
         "DB_PASS": db_pass
     })
     
-    # 7. Verificación Final de la Base de Datos
+    # 7. Verificación de conectividad con el Dashboard (Admin)
+    print(f"\n[*] Verificando conectividad con el Dashboard en {admin_ip}:5000...")
+    dash_test = test_socket(admin_ip, 5000)
+    if dash_test:
+        print(f"[OK] Conexión con Dashboard EXITOSA (Admin está recibiendo logs).")
+    else:
+        print(f"[!] ADVERTENCIA: No se pudo conectar con el Dashboard en {admin_ip}:5000.")
+        print(f"    Verifica que el script main.py esté corriendo en el Servidor Admin.")
+
+    # 8. Verificación Final de la Base de Datos
     print("\n[*] Realizando verificación final de la base de datos...")
     is_healthy = check_db_health(db_user, db_pass, db_host, db_name)
     
@@ -213,6 +222,7 @@ def setup_db_config():
         print(f"   Base de Datos: {db_name}")
         print(f"   Usuario: {db_user}")
         print(f"   Escuchando en: 0.0.0.0:3306")
+        print(f"   Conectividad Admin: {'OK' if dash_test else 'FALLIDA'}")
     else:
         print("   ¡CONFIGURACIÓN COMPLETADA CON ADVERTENCIAS!")
         print("   Estado de MySQL: OFFLINE (Verifica credenciales o red)")

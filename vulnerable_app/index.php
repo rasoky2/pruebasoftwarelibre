@@ -139,29 +139,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         </div>
 
         <form method="POST" class="space-y-6" id="loginForm">
-            <!-- Health Check Badges -->
-            <div class="flex gap-2 justify-center mb-4">
-                <?php if ($db_connection_error): ?>
-                    <span class="inline-flex items-center rounded-full bg-red-50 px-2.5 py-0.5 text-xs font-medium text-red-700 border border-red-200" title="<?php echo $db_connection_error; ?>">
-                        <span class="mr-1 h-1.5 w-1.5 rounded-full bg-red-500"></span> MySQL Offline
-                    </span>
-                <?php else: ?>
-                    <span class="inline-flex items-center rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-medium text-green-700 border border-green-200">
-                        <span class="mr-1 h-1.5 w-1.5 rounded-full bg-green-500"></span> MySQL Online
-                    </span>
-                <?php endif; ?>
-
-                <?php if (!$ldap_server_online): ?>
-                    <span class="inline-flex items-center rounded-full bg-red-50 px-2.5 py-0.5 text-xs font-medium text-red-700 border border-red-200" title="<?php echo $ldap_connection_error; ?>">
-                        <span class="mr-1 h-1.5 w-1.5 rounded-full bg-red-500"></span> LDAP Offline
-                    </span>
-                <?php else: ?>
-                    <span class="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700 border border-blue-200">
-                        <span class="mr-1 h-1.5 w-1.5 rounded-full bg-blue-500"></span> LDAP Online
-                    </span>
-                <?php endif; ?>
-            </div>
-
             <!-- Selección de Método de Autenticación -->
             <div class="flex justify-around border-b border-gray-200 pb-2 mb-6">
                 <button type="button" id="tabDB" onclick="setMethod('DB')" class="tab-btn pb-2 text-sm font-semibold tab-active">Tradicional</button>
