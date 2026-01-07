@@ -1,4 +1,8 @@
 <?php
+// Desactivar visualización de errores en producción
+error_reporting(0);
+ini_set('display_errors', 0);
+
 include 'db_setup.php';
 require_once 'auth_ldap.php'; // Integración con el proyecto de Agustín
 session_start();
