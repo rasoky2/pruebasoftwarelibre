@@ -90,23 +90,50 @@ def install_suricata():
 def configure_suricata(main_server_ip):
     print("[*] Configurando Suricata en Nodo de Borde...")
     local_ip = get_local_ip()
-    suricata_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "suricata"))
-    suricata_yaml = os.path.join(suricata_dir, "suricata.yaml")
-    local_rules = os.path.join(suricata_dir, "rules", "local.rules")
+    
+    # Rutas del sistema
+    suricata_etc_dir = "/etc/suricata"
+    suricata_yaml = os.path.join(suricata_etc_dir, "suricata.yaml")
+    
+    # Rutas del proyecto
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    local_rules_src = os.path.join(project_root, "suricata", "rules", "local.rules")
+    local_rules_dst = os.path.join(suricata_etc_dir, "rules", "local.rules")
 
+    # 1. Copiar reglas personalizadas
+    if os.path.exists(local_rules_src):
+        try:
+            subprocess.run(["sudo", "mkdir", "-p", os.path.dirname(local_rules_dst)], check=False)
+            subprocess.run(["sudo", "cp", local_rules_src, local_rules_dst], check=True)
+            print(f"[OK] Reglas copiadas a {local_rules_dst}")
+        except Exception as e:
+            print(f"[!] Error copiando reglas: {e}")
+    
+    # 2. Configurar suricata.yaml
     if os.path.exists(suricata_yaml):
-        with open(suricata_yaml, "r") as f: content = f.read()
-        
-        # HOME_NET y Reglas
-        content = re.sub(r'HOME_NET: "\[.*?\]"', f'HOME_NET: "[{local_ip}/32]"', content)
-        if "rule-files:" in content:
-            if "local.rules" not in content:
-                content = content.replace("rule-files:", f"rule-files:\n  - {local_rules}")
-        
-        with open(suricata_yaml, "w") as f: f.write(content)
-        print(f"[OK] Suricata configurado (HOME_NET: {local_ip})")
+        try:
+            with open(suricata_yaml, "r") as f: content = f.read()
+            
+            # HOME_NET
+            content = re.sub(r'HOME_NET: "\[.*?\]"', f'HOME_NET: "[{local_ip}/32]"', content)
+            
+            # Incluir local.rules
+            if "rule-files:" in content:
+                if "local.rules" not in content:
+                    content = content.replace("rule-files:", f"rule-files:\n  - {local_rules_dst}")
+            
+            # Guardar en temporal y mover con sudo
+            temp_yml = "/tmp/suricata.yaml"
+            with open(temp_yml, "w") as f: f.write(content)
+            subprocess.run(["sudo", "cp", temp_yml, suricata_yaml], check=True)
+            
+            # Reiniciar servicio
+            subprocess.run(["sudo", "systemctl", "restart", "suricata"], check=True)
+            print(f"[OK] Suricata configurado y reiniciado (HOME_NET: {local_ip})")
+        except Exception as e:
+            print(f"[!] Error editando suricata.yaml: {e}")
     else:
-        print("[!] Advertencia: No se encontró suricata.yaml base.")
+        print(f"[!] No se encontró {suricata_yaml}. ¿Está instalado Suricata?")
 
 def setup_nginx():
     if os.geteuid() != 0:
@@ -242,9 +269,12 @@ def setup_nginx():
                     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
                     suricata_dir = os.path.join(project_root, "suricata")
                     
-                    # Leer y parchear Log Shipper
+                    # Leer y parchear Log Shipper (WorkingDirectory y ExecStart)
                     with open(shipper_service_src, 'r') as f: content = f.read()
+                    
+                    # Reemplazar la ruta hardcodeada por la real
                     content = content.replace("/var/www/html/pruebasoftwarelibre/suricata", suricata_dir)
+                    
                     temp_shipper = "/tmp/log-shipper-nginx.service"
                     with open(temp_shipper, 'w') as f: f.write(content)
                     

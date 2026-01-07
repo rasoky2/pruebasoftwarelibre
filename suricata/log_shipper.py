@@ -51,14 +51,27 @@ def send_heartbeat_loop(url, local_ip, sensor_type):
         time.sleep(10)
 
 def ship_suricata_logs():
-    # Cargar configuración desde .env
-    env_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".env"))
-    load_dotenv(env_path)
+    # Intentar cargar .env desde múltiples ubicaciones posibles
+    possible_paths = [
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".env")), # Desde suricata/..
+        "/var/www/html/pruebasoftwarelibre/.env", # Ruta absoluta estándar
+        os.path.join(os.getcwd(), ".env") # Ruta actual
+    ]
+    
+    env_loaded = False
+    for env_path in possible_paths:
+        if os.path.exists(env_path):
+            load_dotenv(env_path)
+            print(f"[*] Configuración cargada desde: {env_path}")
+            env_loaded = True
+            break
+            
+    if not env_loaded:
+        print("[!] ADVERTENCIA: No se encontró archivo .env. Usando valores por defecto.")
     
     admin_ip = os.getenv("ADMIN_IP", "127.0.0.1")
     sensor_type = os.getenv("SENSOR_TYPE", "nginx") # 'nginx' o 'database'
     dashboard_url = f"http://{admin_ip}:5000/api/heartbeat"
-    log_file = "/var/log/suricata/eve.json"
     local_ip = get_local_ip()
     
     print(f"\n" + "="*50)
