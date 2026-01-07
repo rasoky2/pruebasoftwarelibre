@@ -37,8 +37,8 @@ banned_ips = [] # Lista de IPs bloqueadas por el Admin
 
 # Estado de salud de los sensores
 sensors_health = {
-    "db": {"status": "OFFLINE", "last_seen": None, "ip": ""},
-    "nginx": {"status": "OFFLINE", "last_seen": None, "ip": ""}
+    "db": {"status": "OFFLINE", "last_seen": None, "ip": "", "metrics": {"cpu": 0, "ram": 0}},
+    "nginx": {"status": "OFFLINE", "last_seen": None, "ip": "", "metrics": {"cpu": 0, "ram": 0}}
 }
 
 def load_config():

@@ -23,5 +23,5 @@ alert tcp any any -> $HOME_NET 22 (msg:"INTENTO DE ACCESO SSH"; flow:to_server; 
 alert tcp any any -> $HOME_NET any (msg:"POSSIBLE Port Scan (SYN Flags)"; flags:S; threshold:type both, track by_src, count 20, seconds 10; classtype:attempted-recon; sid:1000009; rev:1;)
 
 # --- AUDITORÍA DE ACCESO A DATOS ---
-# Detectar cualquier conexión de red a MySQL (Puerto 3306)
-alert tcp any any -> $HOME_NET 3306 (msg:"CONSULTA / ACCESO A BASE DE DATOS"; flow:to_server,established; flags:S; classtype:policy-violation; sid:1000010; rev:1;)
+# Detectar cualquier tráfico establecido hacia MySQL (Puerto 3306)
+alert tcp any any -> $HOME_NET 3306 (msg:"CONSULTA / ACCESO A BASE DE DATOS"; flow:to_server,established; classtype:policy-violation; sid:1000010; rev:1;)
