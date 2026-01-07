@@ -121,18 +121,33 @@ def configure_suricata(main_server_ip):
             # 1. Ajustar default-rule-path
             content = re.sub(r'default-rule-path:.*', 'default-rule-path: /etc/suricata/rules', content)
             
-            # 2. Reemplazar toda la sección rule-files
-            # Regex robusta: busca "rule-files:" seguido de líneas identadas hasta encontrar una línea que NO empiece por espacio (nueva clave o fin)
-            # El uso de [\s\S] asegura que coincida con saltos de línea también.
+            # 2. Reconstrucción segura línea por línea (Nuclear option)
+            # Esto elimina cualquier versión corrupta de rule-files existente
+            lines = content.splitlines()
+            new_lines = []
+            skip_mode = False
             
-            # Definimos el bloque limpio
-            clean_block = f"rule-files:\n  - {os.path.basename(local_rules_dst)}\n  - suricata.rules\n"
+            for line in lines:
+                # Detectar inicio de rule-files
+                if re.match(r'^\s*rule-files:', line):
+                    skip_mode = True
+                    continue
+                
+                if skip_mode:
+                    # Si estamos saltando, seguimos saltando mientras la línea empiece por espacio (items de lista)
+                    # O si es una línea vacía o comentario dentro del bloque
+                    if re.match(r'^\s+', line) or re.match(r'^\s*$', line) or re.match(r'^\s*#', line):
+                        continue
+                    else:
+                        # Encontramos algo que no es indentado (nueva clave), dejamos de saltar
+                        skip_mode = False
+                
+                new_lines.append(line)
             
-            # Intentamos reemplazo
-            if "rule-files:" in content:
-                content = re.sub(r'^rule-files:[\s\S]*?(?=\n\S|\Z)', clean_block, content, flags=re.MULTILINE)
-            else:
-                 content += f"\n{clean_block}"
+            # Re ensamblar y añadir el bloque limpio al final
+            content = "\n".join(new_lines)
+            clean_block = f"\nrule-files:\n  - {os.path.basename(local_rules_dst)}\n  - suricata.rules\n"
+            content += clean_block
             
             # Guardar en temporal
             temp_yml = "/tmp/suricata.yaml"
