@@ -122,16 +122,31 @@ def configure_suricata(main_server_ip):
                 if "local.rules" not in content:
                     content = content.replace("rule-files:", f"rule-files:\n  - {local_rules_dst}")
             
-            # Guardar en temporal y mover con sudo
+            # Guardar en temporal
             temp_yml = "/tmp/suricata.yaml"
             with open(temp_yml, "w") as f: f.write(content)
-            subprocess.run(["sudo", "cp", temp_yml, suricata_yaml], check=True)
             
-            # Reiniciar servicio
-            subprocess.run(["sudo", "systemctl", "restart", "suricata"], check=True)
-            print(f"[OK] Suricata configurado y reiniciado (HOME_NET: {local_ip})")
+            # --- VALIDACIÓN DE CONFIGURACIÓN ---
+            print("[*] Validando configuración de Suricata antes de aplicar...")
+            res_val = subprocess.run(["sudo", "suricata", "-T", "-c", temp_yml], capture_output=True, text=True)
+            
+            if res_val.returncode == 0:
+                # Configuración válida, aplicamos
+                subprocess.run(["sudo", "cp", temp_yml, suricata_yaml], check=True)
+                
+                # Asegurar permisos de reglas
+                subprocess.run(["sudo", "chmod", "644", local_rules_dst], check=False)
+                
+                # Reiniciar servicio
+                subprocess.run(["sudo", "systemctl", "restart", "suricata"], check=True)
+                print(f"[OK] Suricata configurado y reiniciado correctamente (HOME_NET: {local_ip})")
+            else:
+                print(f"\n[!] ERROR CRÍTICO: La configuración generada de Suricata no es válida.")
+                print(f"    No se aplicaron cambios para evitar romper el servicio.")
+                print(f"    Detalle del error:\n{res_val.stderr}\n")
+                
         except Exception as e:
-            print(f"[!] Error editando suricata.yaml: {e}")
+            print(f"[!] Error editando/aplicando suricata.yaml: {e}")
     else:
         print(f"[!] No se encontró {suricata_yaml}. ¿Está instalado Suricata?")
 
