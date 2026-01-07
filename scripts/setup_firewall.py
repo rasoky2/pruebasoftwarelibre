@@ -647,14 +647,24 @@ def setup_firewall():
     suggested_db = "127.0.0.1"
     
     if os.path.exists(env_path):
+        print(f"\n{Colors.OKBLUE}[*] Leyendo configuración desde .env...{Colors.ENDC}")
         with open(env_path, 'r') as f:
             for line in f:
-                if "NGINX_IP=" in line:
+                if "ADMIN_IP=" in line:
+                    suggested_admin = line.split('=')[1].strip()
+                elif "NGINX_IP=" in line:
                     suggested_nginx = line.split('=')[1].strip()
                 elif "DB_IP=" in line:
                     suggested_db = line.split('=')[1].strip()
+        
+        print(f"{Colors.OKGREEN}[OK] Configuración cargada:{Colors.ENDC}")
+        print(f"    Admin IP: {suggested_admin}")
+        print(f"    Nginx IP: {suggested_nginx}")
+        print(f"    DB IP: {suggested_db}")
+    else:
+        print(f"{Colors.WARNING}[!] No se encontró archivo .env, usando valores por defecto{Colors.ENDC}")
     
-    admin_ip = input(f"{Colors.OKBLUE}Ingrese IP del Servidor Admin [{suggested_admin}]: {Colors.ENDC}") or suggested_admin
+    admin_ip = input(f"\n{Colors.OKBLUE}Ingrese IP del Servidor Admin [{suggested_admin}]: {Colors.ENDC}") or suggested_admin
     
     reset_iptables()
 

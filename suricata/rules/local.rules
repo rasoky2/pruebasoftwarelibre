@@ -100,8 +100,8 @@ alert http $EXTERNAL_NET any -> $HTTP_SERVERS any (msg:"ATTACK: XSS - onerror Ev
 
 # --- LDAP INJECTION ---
 # Detectar LDAP Injection básica
-alert http $EXTERNAL_NET any -> $HTTP_SERVERS any (msg:"ATTACK: LDAP Injection - Wildcard (*)"; flow:established,to_server; content:"*)("; http_client_body; classtype:web-application-attack; sid:1000038; rev:1;)
-alert http $EXTERNAL_NET any -> $HTTP_SERVERS any (msg:"ATTACK: LDAP Injection - OR Filter"; flow:established,to_server; content:")(|"; http_client_body; classtype:web-application-attack; sid:1000039; rev:1;)
+alert http $EXTERNAL_NET any -> $HTTP_SERVERS any (msg:"ATTACK: LDAP Injection - Wildcard"; flow:established,to_server; content:"|2a 29 28|"; http_client_body; classtype:web-application-attack; sid:1000038; rev:1;)
+alert http $EXTERNAL_NET any -> $HTTP_SERVERS any (msg:"ATTACK: LDAP Injection - OR Filter"; flow:established,to_server; content:"|29 28 7c|"; http_client_body; classtype:web-application-attack; sid:1000039; rev:1;)
 
 # --- DETECCIÓN DE RED Y ACCESO ---
 # Detectar PING (ICMP) hacia el servidor
@@ -122,8 +122,8 @@ alert tcp any any -> $HOME_NET 5432 (msg:"AUDIT: Database Access (PostgreSQL Por
 
 # --- COMMAND INJECTION ---
 # Detectar Command Injection básica
-alert http $EXTERNAL_NET any -> $HTTP_SERVERS any (msg:"ATTACK: Command Injection - Pipe Character"; flow:established,to_server; content:"|"; http_client_body; classtype:web-application-attack; sid:1000041; rev:1;)
-alert http $EXTERNAL_NET any -> $HTTP_SERVERS any (msg:"ATTACK: Command Injection - Semicolon"; flow:established,to_server; content:";"; http_client_body; classtype:web-application-attack; sid:1000042; rev:1;)
+alert http $EXTERNAL_NET any -> $HTTP_SERVERS any (msg:"ATTACK: Command Injection - Pipe Character"; flow:established,to_server; content:"|7c|"; http_client_body; classtype:web-application-attack; sid:1000041; rev:1;)
+alert http $EXTERNAL_NET any -> $HTTP_SERVERS any (msg:"ATTACK: Command Injection - Semicolon"; flow:established,to_server; content:"|3b|"; http_client_body; classtype:web-application-attack; sid:1000042; rev:1;)
 
 # Detectar comandos del sistema
 alert http $EXTERNAL_NET any -> $HTTP_SERVERS any (msg:"ATTACK: Command Injection - /bin/bash"; flow:established,to_server; content:"/bin/bash"; nocase; http_client_body; classtype:web-application-attack; sid:1000043; rev:1;)
