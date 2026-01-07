@@ -94,6 +94,242 @@ def verificar_netplan():
         
     return True
 
+def test_internet_connectivity():
+    """Prueba conectividad a Internet"""
+    print(f"\n{Colors.HEADER}{'='*60}{Colors.ENDC}")
+    print(f"{Colors.HEADER}   DIAGNÓSTICO DE CONECTIVIDAD A INTERNET{Colors.ENDC}")
+    print(f"{Colors.HEADER}{'='*60}{Colors.ENDC}\n")
+    
+    test_hosts = [
+        ("8.8.8.8", "Google DNS"),
+        ("1.1.1.1", "Cloudflare DNS"),
+        ("208.67.222.222", "OpenDNS")
+    ]
+    
+    success_count = 0
+    for host, name in test_hosts:
+        print(f"{Colors.OKBLUE}[*] Probando conectividad a {name} ({host})...{Colors.ENDC}", end=" ")
+        result = subprocess.run(f"ping -c 1 -W 2 {host}", shell=True, capture_output=True, text=True)
+        
+        if result.returncode == 0:
+            # Extraer tiempo de respuesta
+            if "time=" in result.stdout:
+                time_str = result.stdout.split("time=")[1].split()[0]
+                print(f"{Colors.OKGREEN}[OK] {time_str}{Colors.ENDC}")
+                success_count += 1
+            else:
+                print(f"{Colors.OKGREEN}[OK]{Colors.ENDC}")
+                success_count += 1
+        else:
+            print(f"{Colors.FAIL}[FAIL]{Colors.ENDC}")
+    
+    print(f"\n{Colors.OKBLUE}[*] Resultado: {success_count}/{len(test_hosts)} servidores alcanzables{Colors.ENDC}")
+    
+    if success_count == 0:
+        print(f"{Colors.FAIL}[!] NO HAY CONECTIVIDAD A INTERNET{Colors.ENDC}")
+        print(f"{Colors.WARNING}[!] Verifica tu configuración de red y gateway{Colors.ENDC}")
+        return False
+    elif success_count < len(test_hosts):
+        print(f"{Colors.WARNING}[!] Conectividad parcial detectada{Colors.ENDC}")
+        return True
+    else:
+        print(f"{Colors.OKGREEN}[OK] Conectividad a Internet: EXCELENTE{Colors.ENDC}")
+        return True
+
+def test_ping_custom():
+    """Permite hacer ping a una IP personalizada"""
+    print(f"\n{Colors.HEADER}{'='*60}{Colors.ENDC}")
+    print(f"{Colors.HEADER}   PRUEBA DE PING PERSONALIZADA{Colors.ENDC}")
+    print(f"{Colors.HEADER}{'='*60}{Colors.ENDC}\n")
+    
+    target = input(f"{Colors.OKBLUE}[*] Ingresa la IP o dominio a probar: {Colors.ENDC}").strip()
+    
+    if not target:
+        print(f"{Colors.FAIL}[!] No se ingresó ninguna IP{Colors.ENDC}")
+        return
+    
+    count = input(f"{Colors.OKBLUE}[*] Número de pings [4]: {Colors.ENDC}").strip() or "4"
+    
+    print(f"\n{Colors.OKBLUE}[*] Ejecutando: ping -c {count} {target}{Colors.ENDC}\n")
+    
+    result = subprocess.run(f"ping -c {count} {target}", shell=True, capture_output=True, text=True)
+    
+    if result.returncode == 0:
+        print(f"{Colors.OKGREEN}{result.stdout}{Colors.ENDC}")
+        
+        # Extraer estadísticas
+        if "packets transmitted" in result.stdout:
+            stats_line = [line for line in result.stdout.split("\n") if "packets transmitted" in line][0]
+            print(f"\n{Colors.OKGREEN}[OK] Estadísticas: {stats_line}{Colors.ENDC}")
+        
+        if "rtt min/avg/max" in result.stdout:
+            rtt_line = [line for line in result.stdout.split("\n") if "rtt min/avg/max" in line][0]
+            print(f"{Colors.OKGREEN}[OK] Latencia: {rtt_line}{Colors.ENDC}")
+    else:
+        print(f"{Colors.FAIL}{result.stdout}{Colors.ENDC}")
+        print(f"{Colors.FAIL}[!] No se pudo alcanzar {target}{Colors.ENDC}")
+        print(f"{Colors.WARNING}[!] Verifica que la IP/dominio sea correcto y que haya conectividad{Colors.ENDC}")
+
+def get_current_ip_config():
+    """Obtiene la configuración IP actual"""
+    try:
+        # Obtener interfaz activa
+        result = subprocess.run("ip route | grep default", shell=True, capture_output=True, text=True)
+        if result.returncode == 0 and result.stdout:
+            interface = result.stdout.split()[4]
+        else:
+            interface = "eth0"
+        
+        # Obtener IP actual
+        result = subprocess.run(f"ip addr show {interface}", shell=True, capture_output=True, text=True)
+        current_ip = "No detectada"
+        if "inet " in result.stdout:
+            for line in result.stdout.split("\n"):
+                if "inet " in line and "inet6" not in line:
+                    current_ip = line.strip().split()[1].split("/")[0]
+                    break
+        
+        # Obtener gateway
+        result = subprocess.run("ip route | grep default", shell=True, capture_output=True, text=True)
+        gateway = "No detectado"
+        if result.returncode == 0 and result.stdout:
+            gateway = result.stdout.split()[2]
+        
+        return interface, current_ip, gateway
+    except Exception as e:
+        print(f"{Colors.FAIL}[!] Error obteniendo configuración: {e}{Colors.ENDC}")
+        return "eth0", "No detectada", "No detectado"
+
+def change_static_ip():
+    """Permite cambiar la IP estática editando Netplan"""
+    print(f"\n{Colors.HEADER}{'='*60}{Colors.ENDC}")
+    print(f"{Colors.HEADER}   CAMBIAR CONFIGURACIÓN DE RED (NETPLAN){Colors.ENDC}")
+    print(f"{Colors.HEADER}{'='*60}{Colors.ENDC}\n")
+    
+    # Obtener configuración actual
+    interface, current_ip, current_gateway = get_current_ip_config()
+    
+    print(f"{Colors.OKBLUE}[*] Configuración actual:{Colors.ENDC}")
+    print(f"    Interfaz: {interface}")
+    print(f"    IP: {current_ip}")
+    print(f"    Gateway: {current_gateway}")
+    
+    # Buscar archivo de Netplan
+    netplan_dir = "/etc/netplan/"
+    if not os.path.exists(netplan_dir):
+        print(f"{Colors.FAIL}[!] No se encontró /etc/netplan/{Colors.ENDC}")
+        return
+    
+    files = [f for f in os.listdir(netplan_dir) if f.endswith('.yaml') or f.endswith('.yml')]
+    if not files:
+        print(f"{Colors.FAIL}[!] No hay archivos de configuración en /etc/netplan/{Colors.ENDC}")
+        return
+    
+    netplan_file = os.path.join(netplan_dir, files[0])
+    print(f"\n{Colors.OKBLUE}[*] Archivo de configuración: {netplan_file}{Colors.ENDC}")
+    
+    # Solicitar nueva configuración
+    print(f"\n{Colors.WARNING}[!] Ingresa la nueva configuración (Enter para mantener actual):{Colors.ENDC}")
+    
+    new_ip = input(f"{Colors.OKBLUE}Nueva IP [{current_ip}]: {Colors.ENDC}").strip() or current_ip
+    new_gateway = input(f"{Colors.OKBLUE}Nuevo Gateway [{current_gateway}]: {Colors.ENDC}").strip() or current_gateway
+    new_dns = input(f"{Colors.OKBLUE}DNS [8.8.8.8,8.8.4.4]: {Colors.ENDC}").strip() or "8.8.8.8,8.8.4.4"
+    
+    # Confirmar cambios
+    print(f"\n{Colors.WARNING}[!] Se aplicará la siguiente configuración:{Colors.ENDC}")
+    print(f"    IP: {new_ip}/24")
+    print(f"    Gateway: {new_gateway}")
+    print(f"    DNS: {new_dns}")
+    
+    confirm = input(f"\n{Colors.WARNING}¿Continuar? (s/N): {Colors.ENDC}").lower()
+    if confirm != 's':
+        print(f"{Colors.OKBLUE}[*] Operación cancelada{Colors.ENDC}")
+        return
+    
+    # Crear configuración de Netplan
+    dns_list = new_dns.split(',')
+    dns_yaml = "\n          - ".join(dns_list)
+    
+    netplan_config = f"""network:
+  version: 2
+  renderer: networkd
+  ethernets:
+    {interface}:
+      dhcp4: no
+      addresses:
+        - {new_ip}/24
+      routes:
+        - to: default
+          via: {new_gateway}
+      nameservers:
+        addresses:
+          - {dns_yaml}
+"""
+    
+    # Hacer backup del archivo actual
+    backup_file = f"{netplan_file}.backup"
+    try:
+        subprocess.run(f"sudo cp {netplan_file} {backup_file}", shell=True, check=True)
+        print(f"{Colors.OKGREEN}[OK] Backup creado: {backup_file}{Colors.ENDC}")
+    except Exception as e:
+        print(f"{Colors.FAIL}[!] Error creando backup: {e}{Colors.ENDC}")
+        return
+    
+    # Escribir nueva configuración
+    try:
+        with open("/tmp/netplan_new.yaml", "w") as f:
+            f.write(netplan_config)
+        
+        subprocess.run(f"sudo cp /tmp/netplan_new.yaml {netplan_file}", shell=True, check=True)
+        print(f"{Colors.OKGREEN}[OK] Configuración escrita en {netplan_file}{Colors.ENDC}")
+    except Exception as e:
+        print(f"{Colors.FAIL}[!] Error escribiendo configuración: {e}{Colors.ENDC}")
+        return
+    
+    # Validar sintaxis
+    print(f"\n{Colors.OKBLUE}[*] Validando sintaxis de Netplan...{Colors.ENDC}")
+    result = subprocess.run("sudo netplan generate", shell=True, capture_output=True, text=True)
+    
+    if result.returncode != 0:
+        print(f"{Colors.FAIL}[!] Error en la sintaxis:{Colors.ENDC}")
+        print(f"{Colors.FAIL}{result.stderr}{Colors.ENDC}")
+        print(f"{Colors.WARNING}[!] Restaurando backup...{Colors.ENDC}")
+        subprocess.run(f"sudo cp {backup_file} {netplan_file}", shell=True)
+        return
+    
+    print(f"{Colors.OKGREEN}[OK] Sintaxis válida{Colors.ENDC}")
+    
+    # Aplicar cambios
+    print(f"\n{Colors.WARNING}[!] ADVERTENCIA: Se perderá la conexión SSH si estás conectado remotamente{Colors.ENDC}")
+    confirm_apply = input(f"{Colors.WARNING}¿Aplicar cambios ahora? (s/N): {Colors.ENDC}").lower()
+    
+    if confirm_apply == 's':
+        print(f"\n{Colors.OKBLUE}[*] Aplicando configuración de red...{Colors.ENDC}")
+        result = subprocess.run("sudo netplan apply", shell=True, capture_output=True, text=True)
+        
+        if result.returncode == 0:
+            print(f"{Colors.OKGREEN}[OK] Configuración aplicada exitosamente{Colors.ENDC}")
+            print(f"\n{Colors.OKBLUE}[*] Nueva configuración:{Colors.ENDC}")
+            time.sleep(2)
+            
+            # Mostrar nueva IP
+            new_interface, new_current_ip, new_current_gateway = get_current_ip_config()
+            print(f"    IP: {new_current_ip}")
+            print(f"    Gateway: {new_current_gateway}")
+            
+            # Probar conectividad
+            print(f"\n{Colors.OKBLUE}[*] Probando conectividad...{Colors.ENDC}")
+            test_internet_connectivity()
+        else:
+            print(f"{Colors.FAIL}[!] Error aplicando configuración:{Colors.ENDC}")
+            print(f"{Colors.FAIL}{result.stderr}{Colors.ENDC}")
+            print(f"{Colors.WARNING}[!] Puedes restaurar el backup con:{Colors.ENDC}")
+            print(f"    sudo cp {backup_file} {netplan_file}")
+            print(f"    sudo netplan apply")
+    else:
+        print(f"{Colors.OKBLUE}[*] Configuración guardada pero no aplicada{Colors.ENDC}")
+        print(f"{Colors.OKBLUE}[*] Para aplicar manualmente: sudo netplan apply{Colors.ENDC}")
+
 def verificar_reglas_existentes():
     """Verifica si ya existen reglas de iptables configuradas"""
     result = subprocess.run("sudo iptables -L -n", shell=True, capture_output=True, text=True)
@@ -534,10 +770,33 @@ def setup_firewall():
         if input().lower() == 's':
             install_firewall_agent_service()
 
-    # Diagnóstico final
-    print(f"\n{Colors.OKBLUE}[*] ¿Desea ejecutar diagnóstico de conectividad? (s/N): {Colors.ENDC}", end="")
-    if input().lower() == 's':
-        diagnostico_final(choice, admin_ip, nginx_ip, db_ip)
+    # Menú de Herramientas de Red
+    print(f"\n{Colors.HEADER}{'='*60}{Colors.ENDC}")
+    print(f"{Colors.HEADER}   HERRAMIENTAS DE RED Y DIAGNÓSTICO{Colors.ENDC}")
+    print(f"{Colors.HEADER}{'='*60}{Colors.ENDC}\n")
+    
+    while True:
+        print(f"{Colors.OKBLUE}[1] Diagnosticar conectividad a Internet{Colors.ENDC}")
+        print(f"{Colors.OKBLUE}[2] Hacer ping a IP/dominio personalizado{Colors.ENDC}")
+        print(f"{Colors.OKBLUE}[3] Cambiar configuración de red (IP estática){Colors.ENDC}")
+        print(f"{Colors.OKBLUE}[4] Diagnóstico completo de infraestructura{Colors.ENDC}")
+        print(f"{Colors.OKBLUE}[5] Salir{Colors.ENDC}")
+        
+        net_choice = input(f"\n{Colors.WARNING}Selecciona una opción (1-5): {Colors.ENDC}").strip()
+        
+        if net_choice == '1':
+            test_internet_connectivity()
+        elif net_choice == '2':
+            test_ping_custom()
+        elif net_choice == '3':
+            change_static_ip()
+        elif net_choice == '4':
+            diagnostico_final(choice, admin_ip, nginx_ip, db_ip)
+        elif net_choice == '5':
+            print(f"\n{Colors.OKGREEN}[*] Saliendo...{Colors.ENDC}")
+            break
+        else:
+            print(f"{Colors.FAIL}[!] Opción inválida{Colors.ENDC}")
 
 if __name__ == "__main__":
     setup_firewall()
