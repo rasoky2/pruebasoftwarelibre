@@ -205,17 +205,22 @@ def setup_nginx():
         if os.path.exists("nginx_temp.conf"): os.remove("nginx_temp.conf")
 
         # Configuración de Seguridad (Suricata)
-        main_server_ip = input(f"\nIngrese IP del Servidor Main (Dashboard) [{local_ip}]: ") or local_ip
+        from setup_inventory import load_env, update_env
+        env_data = load_env()
+        current_admin = env_data.get("ADMIN_IP", local_ip)
+        
+        main_server_ip = input(f"\nIngrese IP del Servidor Main (Dashboard) [{current_admin}]: ") or current_admin
+        
         if input("¿Desea instalar y configurar Suricata IDS en este nodo? (s/N): ").lower() == 's':
             install_suricata()
             configure_suricata(main_server_ip)
             
-            from setup_inventory import update_env
             update_env({
                 "ADMIN_IP": main_server_ip,
-                "NGINX_IP": local_ip
+                "NGINX_IP": local_ip,
+                "SENSOR_TYPE": "nginx"
             })
-            print("[OK] Suricata y .env configurados.")
+            print("[OK] Suricata y SENSOR_TYPE configurados en .env")
             
             # --- NUEVA AUTOMATIZACIÓN: LOG SHIPPER PYTHON ---
             print("\n[*] Configurando Log Shipper (Python) para alertas Suricata...")
