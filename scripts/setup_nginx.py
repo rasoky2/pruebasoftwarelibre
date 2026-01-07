@@ -252,6 +252,20 @@ def setup_nginx():
                         if "DB_IP=" in line:
                             suggested_db_ip = line.split('=')[1].strip()
 
+            db_host = input(f"IP del Servidor MySQL [{suggested_db_ip}]: ") or suggested_db_ip
+            db_name = input("Nombre de la DB [lab_vulnerable]: ") or "lab_vulnerable"
+            db_user = input("Usuario MySQL [webuser]: ") or "webuser"
+            db_pass = input("Contraseña MySQL [web123]: ") or "web123"
+            
+            from setup_inventory import update_env
+            update_env({
+                "DB_IP": db_host,
+                "DB_NAME": db_name,
+                "DB_USER": db_user,
+                "DB_PASS": db_pass
+            })
+            print("[OK] Configuración de Base de Datos actualizada en .env.")
+
         # 5. Verificación de conectividad con el Dashboard (Admin)
         print(f"\n[*] Verificando conectividad con el Dashboard en {main_server_ip}:5000...")
         if test_socket(main_server_ip, 5000):
@@ -267,20 +281,6 @@ def setup_nginx():
         if check_package_installed("suricata"):
             subprocess.run(["sudo", "systemctl", "restart", "log-shipper"], check=False)
         print("[OK] Servicios actualizados.")
-
-            db_host = input(f"IP del Servidor MySQL [{suggested_db_ip}]: ") or suggested_db_ip
-            db_name = input("Nombre de la DB [lab_vulnerable]: ") or "lab_vulnerable"
-            db_user = input("Usuario MySQL [webuser]: ") or "webuser"
-            db_pass = input("Contraseña MySQL [web123]: ") or "web123"
-            
-            from setup_inventory import update_env
-            update_env({
-                "DB_IP": db_host,
-                "DB_NAME": db_name,
-                "DB_USER": db_user,
-                "DB_PASS": db_pass
-            })
-            print("[OK] Configuración de Base de Datos actualizada en .env.")
 
         # 5. Configuración de Servidor LDAP
         if input("\n¿Desea configurar la conexión al Servidor LDAP? (s/N): ").lower() == 's':
