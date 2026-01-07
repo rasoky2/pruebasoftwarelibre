@@ -43,6 +43,7 @@ if ($is_authorized) {
 $MAIN_SERVER_IP = isset($_ENV['ADMIN_IP']) ? $_ENV['ADMIN_IP'] : '127.0.0.1';
 $MAIN_SERVER_PORT = '5000';
 $LDAP_HOST = isset($_ENV['LDAP_IP']) ? $_ENV['LDAP_IP'] : '127.0.0.1';
+$LDAP_DOMAIN = isset($_ENV['LDAP_DOMAIN']) ? $_ENV['LDAP_DOMAIN'] : 'example.com';
 $SURICATA_SENSOR_IP = isset($_ENV['NGINX_IP']) ? $_ENV['NGINX_IP'] : '127.0.0.1';
 
 // Rutas

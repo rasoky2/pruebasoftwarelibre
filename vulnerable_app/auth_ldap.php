@@ -26,12 +26,17 @@ function verificar_servidor_ldap($host, $port = 389, $timeout = 2) {
  * Autenticación con servidor LDAP corporativo
  */
 function autenticar_con_ldap($usuario, $password) {
-    global $ldap_connection_error, $LDAP_HOST;
+    global $ldap_connection_error, $LDAP_HOST, $LDAP_DOMAIN;
     
-    // Datos del Servidor LDAP (desde config.php)
+    // Datos del Servidor LDAP (desde config.php / .env)
     $ldap_host = $LDAP_HOST;
     $ldap_port = 389;
-    $ldap_dn_base = "ou=usuarios,dc=softwarelibre,dc=local";
+    
+    // Construir base DN desde el dominio configurado
+    // Ejemplo: "prueba.com" -> "dc=prueba,dc=com"
+    $domain_parts = explode('.', $LDAP_DOMAIN);
+    $dc_parts = array_map(function($part) { return "dc=$part"; }, $domain_parts);
+    $ldap_dn_base = "ou=users," . implode(',', $dc_parts);
 
     // Verificación previa de conectividad
     if (!verificar_servidor_ldap($ldap_host, $ldap_port, 2)) {
