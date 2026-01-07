@@ -26,6 +26,14 @@ def run_cmd(cmd, silent=False):
             print(f"{Colors.FAIL}[!] Error ejecutando comando: {e}{Colors.ENDC}")
         return False
 
+def is_package_installed(package_name):
+    """Verifica si un paquete de Debian/Ubuntu está instalado"""
+    try:
+        result = subprocess.run(f"dpkg -l {package_name}", shell=True, capture_output=True, text=True)
+        return result.returncode == 0
+    except Exception:
+        return False
+
 def verificar_iptables():
     """Verifica si iptables está instalado"""
     print(f"\n{Colors.OKBLUE}[*] Verificando instalación de iptables...{Colors.ENDC}")
@@ -453,11 +461,16 @@ def setup_firewall():
     subprocess.run("sudo iptables -L -n --line-numbers", shell=True)
 
     # Guardar reglas
-    print(f"\n{Colors.OKBLUE}[*] ¿Desea hacer las reglas persistentes? (Instalará iptables-persistent){Colors.ENDC}")
+    print(f"\n{Colors.OKBLUE}[*] ¿Desea hacer las reglas persistentes?{Colors.ENDC}")
     if input(f"{Colors.WARNING}(s/N): {Colors.ENDC}").lower() == 's':
-        print(f"{Colors.OKBLUE}[*] Instalando iptables-persistent...{Colors.ENDC}")
-        run_cmd("sudo DEBIAN_FRONTEND=noninteractive apt-get update", silent=True)
-        run_cmd("sudo DEBIAN_FRONTEND=noninteractive apt-get install -y iptables-persistent", silent=True)
+        if not is_package_installed("iptables-persistent"):
+            print(f"{Colors.OKBLUE}[*] Instalando iptables-persistent...{Colors.ENDC}")
+            run_cmd("sudo DEBIAN_FRONTEND=noninteractive apt-get update", silent=True)
+            run_cmd("sudo DEBIAN_FRONTEND=noninteractive apt-get install -y iptables-persistent", silent=True)
+        else:
+            print(f"{Colors.OKGREEN}[OK] iptables-persistent ya está instalado.{Colors.ENDC}")
+            
+        print(f"{Colors.OKBLUE}[*] Guardando reglas actuales...{Colors.ENDC}")
         run_cmd("sudo sh -c 'iptables-save > /etc/iptables/rules.v4'", silent=True)
         print(f"{Colors.OKGREEN}[OK] Reglas guardadas en /etc/iptables/rules.v4{Colors.ENDC}")
 
