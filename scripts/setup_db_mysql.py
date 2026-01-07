@@ -194,7 +194,10 @@ def setup_db_config():
         restart_mysql()
 
     # 6. Actualizar .env (ÚNICA FUENTE DE VERDAD)
-    from setup_inventory import update_env
+    from setup_inventory import load_env, update_env
+    env_data = load_env()
+    admin_ip = env_data.get("ADMIN_IP", "127.0.0.1")
+
     update_env({
         "DB_IP": db_host,
         "DB_NAME": db_name,
@@ -202,7 +205,25 @@ def setup_db_config():
         "DB_PASS": db_pass
     })
     
-    # 7. Verificación de conectividad con el Dashboard (Admin)
+    # 7. Instalación del Servicio Heartbeat (Persistencia)
+    if input("\n¿Desea instalar el servicio de latido (Heartbeat) para el Dashboard? (s/N): ").lower() == 's':
+        print("[*] Configurando servicio db-heartbeat...")
+        service_src = os.path.join(os.path.dirname(os.path.dirname(__file__)), "mysql", "db-heartbeat.service")
+        service_dst = "/etc/systemd/system/db-heartbeat.service"
+        
+        if os.path.exists(service_src):
+            try:
+                subprocess.run(["sudo", "cp", service_src, service_dst], check=True)
+                subprocess.run(["sudo", "systemctl", "daemon-reload"], check=True)
+                subprocess.run(["sudo", "systemctl", "enable", "db-heartbeat"], check=True)
+                subprocess.run(["sudo", "systemctl", "restart", "db-heartbeat"], check=True)
+                print("[OK] Servicio db-heartbeat instalado y activo.")
+            except Exception as e:
+                print(f"[!] Error instalando servicio: {e}")
+        else:
+            print(f"[!] No se encontró {service_src}. Saltando instalación de servicio.")
+
+    # 8. Verificación de conectividad con el Dashboard (Admin)
     print(f"\n[*] Verificando conectividad con el Dashboard en {admin_ip}:5000...")
     dash_test = test_socket(admin_ip, 5000)
     if dash_test:

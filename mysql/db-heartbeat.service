@@ -1,0 +1,14 @@
+[Unit]
+Description=SIA Database Heartbeat Service
+After=network.target mysql.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/var/www/html/pruebasoftwarelibre/scripts
+ExecStart=/usr/bin/python3 /var/www/html/pruebasoftwarelibre/scripts/db_heartbeat.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
