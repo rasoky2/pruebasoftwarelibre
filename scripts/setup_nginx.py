@@ -205,7 +205,8 @@ def setup_nginx():
         if os.path.exists("nginx_temp.conf"): os.remove("nginx_temp.conf")
 
         # Configuración de Seguridad (Suricata)
-        if input("\n¿Desea instalar y configurar Suricata IDS en este nodo? (s/N): ").lower() == 's':
+        main_server_ip = input(f"\nIngrese IP del Servidor Main (Dashboard) [{local_ip}]: ") or local_ip
+        if input("¿Desea instalar y configurar Suricata IDS en este nodo? (s/N): ").lower() == 's':
             install_suricata()
             configure_suricata(main_server_ip)
             
