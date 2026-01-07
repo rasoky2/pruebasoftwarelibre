@@ -287,6 +287,9 @@
                       Hora
                     </th>
                     <th class="h-10 px-4 text-left font-medium text-slate-500">
+                      Origen
+                    </th>
+                    <th class="h-10 px-4 text-left font-medium text-slate-500">
                       Método
                     </th>
                     <th class="h-10 px-4 text-left font-medium text-slate-500">
@@ -300,7 +303,7 @@
                 <tbody id="nginxTableBody">
                   <tr id="noNginxLogs">
                     <td
-                      colspan="4"
+                      colspan="5"
                       class="p-8 text-center text-slate-400 italic"
                     >
                       Esperando tráfico...
@@ -597,7 +600,7 @@
 
           const row = document.createElement("tr");
           row.className = rowClass;
-          row.innerHTML = `<td class="p-3 font-mono text-[10px]">${time}</td><td class="p-3">${badge}</td><td class="p-3 text-[10px] text-slate-600 truncate max-w-[150px]">${
+          row.innerHTML = `<td class="p-3 font-mono text-[10px]">${time}</td><td class="p-3 font-mono text-[10px] text-slate-600">${src_ip}</td><td class="p-3">${badge}</td><td class="p-3 text-[10px] text-slate-600 truncate max-w-[150px]">${
             data.message
           } (${
             data.page || "/"
@@ -610,7 +613,7 @@
           document.getElementById("httpCount").innerText = counts.http;
           const row = document.createElement("tr");
           row.className = "border-b hover:bg-slate-50 transition-colors";
-          row.innerHTML = `<td class="p-3 font-mono text-[10px]">${time}</td><td class="p-3"><span class="px-1.5 py-0.5 bg-slate-100 rounded text-[9px] font-bold">${
+          row.innerHTML = `<td class="p-3 font-mono text-[10px]">${time}</td><td class="p-3 font-mono text-[10px] text-slate-600">${src_ip}</td><td class="p-3"><span class="px-1.5 py-0.5 bg-slate-100 rounded text-[9px] font-bold">${
             data.http?.http_method || "GET"
           }</span></td><td class="p-3 text-[10px] text-slate-600 truncate max-w-[150px]">${
             data.http?.url || data.uri || "/"
