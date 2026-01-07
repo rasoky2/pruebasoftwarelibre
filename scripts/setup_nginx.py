@@ -118,11 +118,21 @@ def configure_suricata(main_server_ip):
             content = re.sub(r'HOME_NET: "\[.*?\]"', f'HOME_NET: "[{local_ip}/32]"', content)
             
             # Incluir local.rules
+            # Incluir local.rules
             if "rule-files:" in content:
                 if "local.rules" not in content and local_rules_dst not in content:
-                    # Usamos regex para insertar respetando indentación básica
-                    # Buscamos "rule-files:" seguido de salto de línea
-                    content = re.sub(r'rule-files:\s*\n', f'rule-files:\n  - {local_rules_dst}\n', content)
+                    # Intento inteligente: detectar indentación del primer item existente
+                    match = re.search(r'(rule-files:.*?\n)(\s*)-', content)
+                    if match:
+                        # Encontramos la lista y su indentación
+                        prefix = match.group(1)
+                        indent = match.group(2)
+                        # Reconstruimos: "rule-files:\n" + "  - local.rules\n" + "  -" (inicio del siguiente)
+                        replacement = f"{prefix}{indent}- {local_rules_dst}\n{indent}-"
+                        content = content.replace(match.group(0), replacement, 1)
+                    else:
+                        # Fallback simple si la lista está vacía o formato raro (asumimos standard)
+                        content = re.sub(r'rule-files:\s*\n', f'rule-files:\n  - {local_rules_dst}\n', content)
             
             # Guardar en temporal
             temp_yml = "/tmp/suricata.yaml"
