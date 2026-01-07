@@ -3,6 +3,7 @@ import socket
 import re
 
 def get_local_ip():
+    """Obtiene la IP local de la máquina"""
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.connect(("8.8.8.8", 80))
@@ -16,6 +17,9 @@ def update_env(updates):
     """
     Actualiza el archivo .env con las claves proporcionadas.
     Esta es la ÚNICA función que debe modificar el .env.
+    
+    Args:
+        updates (dict): Diccionario con las claves y valores a actualizar
     """
     env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
     env_data = {}
@@ -62,42 +66,8 @@ def update_config_php(updates):
         f.write(content)
     print("[+] config.php actualizado (legacy).")
 
-def setup_inventory():
-    print("\n" + "="*50)
-    print("   CONFIGURADOR GLOBAL DE INFRAESTRUCTURA")
-    print("="*50)
-    local_ip = get_local_ip()
-    
-    central_ip = input(f"IP Servidor Central (Dashboard + LDAP) [{local_ip}]: ") or local_ip
-    db_host = input("IP Servidor MySQL [127.0.0.1]: ") or "127.0.0.1"
-    db_name = input("Nombre de la DB [lab_vulnerable]: ") or "lab_vulnerable"
-    db_user = input("Usuario MySQL [webuser]: ") or "webuser"
-    db_pass = input("Contraseña MySQL [web123]: ") or "web123"
-    
-    # ÚNICA FUENTE DE VERDAD: .env
-    update_env({
-        "ADMIN_IP": central_ip,
-        "NGINX_IP": local_ip,
-        "DB_IP": db_host,
-        "DB_NAME": db_name,
-        "DB_USER": db_user,
-        "DB_PASS": db_pass,
-        "LDAP_IP": central_ip
-    })
-
-    # Actualizar auth_ldap.php solo para la IP de LDAP (no tiene acceso a .env)
-    php_path = os.path.join(os.path.dirname(__file__), "..", "vulnerable_app", "auth_ldap.php")
-    if os.path.exists(php_path):
-        with open(php_path, "r") as f:
-            content = f.read()
-        content = re.sub(r'\$ldap_host\s*=\s*".*?";', f'$ldap_host = "{central_ip}";', content)
-        with open(php_path, "w") as f:
-            f.write(content)
-        print("[+] Módulo LDAP sincronizado.")
-
-    print("\n" + "="*50)
-    print("   ¡CONFIGURACIÓN COMPLETADA!")
-    print("="*50 + "\n")
-
-if __name__ == "__main__":
-    setup_inventory()
+# Este archivo ahora solo contiene funciones de utilidad
+# Para configurar LDAP, usa: setup_ldap.py
+# Para configurar MySQL, usa: setup_db_mysql.py
+# Para configurar Nginx, usa: setup_nginx.py
+# Para configurar Firewall, usa: setup_firewall.py
