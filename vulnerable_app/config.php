@@ -50,4 +50,13 @@ $SURICATA_SENSOR_IP = isset($_ENV['NGINX_IP']) ? $_ENV['NGINX_IP'] : '127.0.0.1'
 
 // Rutas
 $SURICATA_LOG_PATH = '../suricata/logs/eve.json';
+
+// --- SEGUIMIENTO GLOBAL DE ACTIVIDAD ---
+require_once __DIR__ . '/log_shipper.php';
+if (basename($_SERVER['PHP_SELF']) !== 'test.php') {
+    ship_log("page_view", "Usuario visitó la página", [
+        "page" => basename($_SERVER['PHP_SELF']),
+        "user" => $_SESSION['user'] ?? 'Anonimo'
+    ]);
+}
 ?>
