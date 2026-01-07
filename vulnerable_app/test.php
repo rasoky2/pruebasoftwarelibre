@@ -1,17 +1,19 @@
 <?php
 /**
- * test.php - Archivo de diagnóstico para verificar conectividad
- * Este archivo IGNORA el interbloqueo LDAP para propósitos de diagnóstico
+ * test.php - Diagnóstico de Infraestructura Avanzado
+ * Propósito: Detectar EXACTAMENTE por qué falla la conexión entre componentes.
  */
 
-// Cargar .env directamente sin pasar por config.php
+// Forzar visualización de errores solo aquí para diagnosticar
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
 function loadEnvDirect($path) {
-    $env = [];
-    if(!file_exists($path)) return $env;
+    if(!file_exists($path)) return [];
     $lines = file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    $env = [];
     foreach ($lines as $line) {
-        if (strpos(trim($line), '#') === 0) continue;
-        if (strpos($line, '=') === false) continue;
+        if (strpos(trim($line), '#') === 0 || strpos($line, '=') === false) continue;
         list($name, $value) = explode('=', $line, 2);
         $env[trim($name)] = trim($value);
     }
@@ -20,149 +22,252 @@ function loadEnvDirect($path) {
 
 $env = loadEnvDirect(__DIR__ . '/../.env');
 
-// Usar credenciales directamente del .env (sin interbloqueo)
-$DB_HOST = $env['DB_IP'] ?? '127.0.0.1';
-$DB_USER = $env['DB_USER'] ?? 'webuser';
-$DB_PASS = $env['DB_PASS'] ?? 'web123';
-$DB_NAME = $env['DB_NAME'] ?? 'lab_vulnerable';
+// Configuración leída del .env
+$db_ip = $env['DB_IP'] ?? 'NO DEFINIDA';
+$db_user = $env['DB_USER'] ?? 'webuser';
+$db_pass = $env['DB_PASS'] ?? 'web123';
+$db_name = $env['DB_NAME'] ?? 'lab_vulnerable';
+$ldap_ip = $env['LDAP_IP'] ?? 'NO DEFINIDA';
+$admin_ip = $env['ADMIN_IP'] ?? 'NO DEFINIDA';
+
+/**
+ * Función para probar sockets (Conectividad real a nivel de red)
+ */
+function test_socket($ip, $port, $timeout = 2) {
+    $start = microtime(true);
+    $fp = @fsockopen($ip, $port, $errno, $errstr, $timeout);
+    $end = microtime(true);
+    $ms = round(($end - $start) * 1000, 2);
+    
+    if ($fp) {
+        fclose($fp);
+        return ["ok" => true, "ms" => $ms];
+    }
+    return ["ok" => false, "error" => $errstr, "code" => $errno];
+}
+
+/**
+ * Función para simular envío del Log Shipper
+ */
+function test_shipper($admin_ip) {
+    $url = "http://$admin_ip:5000/api/heartbeat";
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 3);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode(['status' => 'diagnostic_test', 'time' => date('Y-m-d H:i:s')]));
+    curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+    
+    $response = curl_exec($ch);
+    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curl_error = curl_error($ch);
+    curl_close($ch);
+    
+    return [
+        "url" => $url,
+        "code" => $http_code,
+        "response" => $response,
+        "error" => $curl_error
+    ];
+}
 ?>
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Diagnóstico del Sistema</title>
+    <title>SIA Diagnostics | Professional View</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
-            min-height: 100vh;
-            padding: 2rem;
-        }
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-        }
-        h1 {
-            color: white;
-            margin-bottom: 2rem;
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-        .card {
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 12px;
-            padding: 1.5rem;
-            margin-bottom: 1.5rem;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
-        }
-        .card h2 {
-            color: #1e3c72;
-            margin-bottom: 1rem;
-            font-size: 1.2rem;
-        }
-        .status {
-            padding: 0.75rem 1rem;
-            border-radius: 8px;
-            font-weight: 600;
-            margin-top: 0.5rem;
-        }
-        .success {
-            background: #d4edda;
-            color: #155724;
-            border-left: 4px solid #28a745;
-        }
-        .error {
-            background: #f8d7da;
-            color: #721c24;
-            border-left: 4px solid #dc3545;
-        }
-        .info {
-            background: #d1ecf1;
-            color: #0c5460;
-            border-left: 4px solid #17a2b8;
-            font-size: 0.9rem;
-            margin-top: 0.5rem;
-        }
-        code {
-            background: #f4f4f4;
-            padding: 0.2rem 0.5rem;
-            border-radius: 4px;
-            font-family: 'Courier New', monospace;
-        }
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+        .mono { font-family: 'JetBrains Mono', monospace; }
+        .status-badge { @apply px-2 py-1 rounded text-xs font-bold uppercase; }
     </style>
 </head>
-<body>
-    <div class="container">
-        <h1>🔍 Diagnóstico del Sistema</h1>
-        
-        <!-- Test 1: Conexión a Base de Datos -->
-        <div class="card">
-            <h2>1. Conexión a Base de Datos (MySQL)</h2>
-            <?php
-            $conn = @new mysqli($DB_HOST, $DB_USER, $DB_PASS, $DB_NAME);
+<body class="p-4 md:p-8">
+    <div class="max-w-5xl mx-auto">
+        <header class="mb-8 flex justify-between items-end border-b pb-4">
+            <div>
+                <h1 class="text-3xl font-bold text-slate-800">🔍 Diagnóstico de Infraestructura</h1>
+                <p class="text-slate-500">Verificando conectividad entre Nginx, DB, LDAP y Dashboard</p>
+            </div>
+            <div class="text-right text-xs text-slate-400 mono">
+                PHP Version: <?php echo phpversion(); ?><br>
+                Time: <?php echo date('H:i:s'); ?>
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             
-            if ($conn->connect_error) {
-                echo '<div class="status error">';
-                echo '❌ ERROR DE CONEXIÓN';
-                echo '</div>';
-                echo '<div class="info">';
-                echo htmlspecialchars($conn->connect_error);
-                echo '</div>';
-            } else {
-                echo '<div class="status success">';
-                echo '✅ CONECTADO';
-                echo '</div>';
-                echo '<div class="info">';
-                echo "Host: <code>$DB_HOST</code><br>";
-                echo "Usuario: <code>$DB_USER</code><br>";
-                echo "Base de Datos: <code>$DB_NAME</code>";
-                echo '</div>';
-                $conn->close();
-            }
-            ?>
+            <!-- 1. BASE DE DATOS (MYSQL) -->
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                <div class="flex justify-between items-start mb-4">
+                    <h2 class="font-bold text-slate-700 flex items-center gap-2">
+                        <span class="text-xl">🗄️</span> Base de Datos (3306)
+                    </h2>
+                    <?php 
+                    $net_db = test_socket($db_ip, 3306);
+                    if ($net_db['ok']): ?>
+                        <span class="status-badge bg-green-100 text-green-700">Red OK (<?php echo $net_db['ms']; ?>ms)</span>
+                    <?php else: ?>
+                        <span class="status-badge bg-red-100 text-red-700">Inalcanzable</span>
+                    <?php endif; ?>
+                </div>
+                
+                <div class="space-y-3">
+                    <div class="bg-slate-50 p-3 rounded mono text-[11px]">
+                        Target: <?php echo $db_ip; ?>:3306<br>
+                        User: <?php echo $db_user; ?><br>
+                        DB: <?php echo $db_name; ?>
+                    </div>
+
+                    <?php
+                    mysqli_report(MYSQLI_REPORT_OFF);
+                    $start = microtime(true);
+                    $conn = @new mysqli($db_ip, $db_user, $db_pass, $db_name);
+                    $end = microtime(true);
+                    $time = round(($end - $start) * 1000, 2);
+
+                    if ($conn->connect_error): ?>
+                        <div class="p-3 bg-red-50 border border-red-200 rounded text-red-700 text-xs">
+                            <strong>Error de MySQL:</strong><br>
+                            <?php echo $conn->connect_error; ?>
+                            <div class="mt-2 text-[10px] text-red-500 italic">
+                                Sugerencia: Verifica privilegios del usuario '<?php echo $db_user; ?>'@'%' en la BD.
+                            </div>
+                        </div>
+                    <?php else: ?>
+                        <div class="p-3 bg-green-50 border border-green-200 rounded text-green-700 text-xs">
+                            ✅ Autenticación Exitosa (<?php echo $time; ?>ms)<br>
+                            <?php 
+                            $res = $conn->query("SELECT VERSION() as v");
+                            $row = $res->fetch_assoc();
+                            echo "Server: " . $row['v'];
+                            ?>
+                        </div>
+                    <?php $conn->close(); endif; ?>
+                </div>
+            </div>
+
+            <!-- 2. SERVIDOR LDAP -->
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                <div class="flex justify-between items-start mb-4">
+                    <h2 class="font-bold text-slate-700 flex items-center gap-2">
+                        <span class="text-xl">🔑</span> Servidor LDAP (389)
+                    </h2>
+                    <?php 
+                    $net_ldap = test_socket($ldap_ip, 389);
+                    if ($net_ldap['ok']): ?>
+                        <span class="status-badge bg-green-100 text-green-700">Red OK (<?php echo $net_ldap['ms']; ?>ms)</span>
+                    <?php else: ?>
+                        <span class="status-badge bg-red-100 text-red-700">Inalcanzable</span>
+                    <?php endif; ?>
+                </div>
+
+                <div class="space-y-3">
+                    <div class="bg-slate-50 p-3 rounded mono text-[11px]">
+                        Target: <?php echo $ldap_ip; ?>:389<br>
+                        Auth: Anonymous Bind Test
+                    </div>
+
+                    <?php if (!extension_loaded('ldap')): ?>
+                        <div class="p-3 bg-orange-50 border border-orange-200 rounded text-orange-700 text-xs">
+                            Extension 'ldap' no instalada en PHP.
+                        </div>
+                    <?php else: 
+                        $ldap_conn = @ldap_connect($ldap_ip, 389);
+                        if ($ldap_conn):
+                            ldap_set_option($ldap_conn, LDAP_OPT_PROTOCOL_VERSION, 3);
+                            ldap_set_option($ldap_conn, LDAP_OPT_NETWORK_TIMEOUT, 2);
+                            $bind = @ldap_bind($ldap_conn); // Anonymous bind simple test
+                    ?>
+                            <div class="p-3 bg-blue-50 border border-blue-200 rounded text-blue-700 text-xs">
+                                Respondiendo a nivel de protocolo.<br>
+                                Anonymous Bind: <?php echo $bind ? "Habilitado" : "No permitido (Requiere credenciales)"; ?>
+                            </div>
+                        <?php else: ?>
+                            <div class="p-3 bg-red-50 border border-red-200 rounded text-red-700 text-xs">
+                                Fallo al conectar con el protocolo LDAP.
+                            </div>
+                    <?php endif; endif; ?>
+                </div>
+            </div>
+
+            <!-- 3. LOG SHIPPER & DASHBOARD -->
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                <div class="flex justify-between items-start mb-4">
+                    <h2 class="font-bold text-slate-700 flex items-center gap-2">
+                        <span class="text-xl">📊</span> Dashboard Shipper (5000)
+                    </h2>
+                    <?php 
+                    $net_dash = test_socket($admin_ip, 5000);
+                    if ($net_dash['ok']): ?>
+                        <span class="status-badge bg-green-100 text-green-700">Red OK (<?php echo $net_dash['ms']; ?>ms)</span>
+                    <?php else: ?>
+                        <span class="status-badge bg-red-100 text-red-700">Inalcanzable</span>
+                    <?php endif; ?>
+                </div>
+
+                <div class="space-y-3">
+                    <div class="bg-slate-50 p-3 rounded mono text-[11px]">
+                        Dashboard: <?php echo $admin_ip; ?>:5000<br>
+                        Endpoint: /api/heartbeat
+                    </div>
+
+                    <?php 
+                    $ship_res = test_shipper($admin_ip);
+                    if ($ship_res['code'] == 200 || $ship_res['code'] == 404): // 404 es aceptable si el endpoint no existe pero el server responde ?>
+                        <div class="p-3 bg-green-50 border border-green-200 rounded text-green-700 text-xs">
+                            ✅ Dashboard Responde (HTTP <?php echo $ship_res['code']; ?>)<br>
+                            <span class="text-[10px]">Response: <?php echo htmlspecialchars(substr($ship_res['response'], 0, 50)); ?>...</span>
+                        </div>
+                    <?php else: ?>
+                        <div class="p-3 bg-red-50 border border-red-200 rounded text-red-700 text-xs">
+                            ❌ Dashboard sin respuesta HTTP.<br>
+                            Error: <?php echo $ship_res['error'] ?: "Código HTTP " . $ship_res['code']; ?>
+                            <div class="mt-2 text-[10px] text-red-500 italic">
+                                Asegúrate de que main.py esté corriendo en <?php echo $admin_ip; ?>.
+                            </div>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+
+            <!-- 4. PERMISOS Y ENTORNO -->
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                <h2 class="font-bold text-slate-700 flex items-center gap-2 mb-4">
+                    <span class="text-xl">📁</span> Entorno y Permisos
+                </h2>
+                <div class="grid grid-cols-2 gap-2 text-[11px]">
+                    <div class="p-2 border rounded flex justify-between">
+                        <span>Archivo .env</span>
+                        <span class="<?php echo file_exists(__DIR__ . '/../.env') ? 'text-green-600' : 'text-red-600'; ?>">
+                            <?php echo file_exists(__DIR__ . '/../.env') ? 'Detectado' : 'FALTANTE'; ?>
+                        </span>
+                    </div>
+                    <div class="p-2 border rounded flex justify-between">
+                        <span>Escritura Temp</span>
+                        <span class="<?php echo is_writable(sys_get_temp_dir()) ? 'text-green-600' : 'text-red-600'; ?>">
+                            <?php echo is_writable(sys_get_temp_dir()) ? 'OK' : 'Error'; ?>
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="mt-4 p-3 bg-indigo-50 border border-indigo-100 rounded text-indigo-700 text-[10px] mono">
+                    <strong>Local IP:</strong> <?php echo $_SERVER['SERVER_ADDR'] ?? 'Unknown'; ?><br>
+                    <strong>Web root:</strong> <?php echo __DIR__; ?><br>
+                    <strong>Extensions:</strong> 
+                    <?php echo extension_loaded('mysqli') ? '[mysqli] ' : '[Falta mysqli] '; ?>
+                    <?php echo extension_loaded('ldap') ? '[ldap] ' : '[Falta ldap] '; ?>
+                    <?php echo extension_loaded('curl') ? '[curl]' : '[Falta curl]'; ?>
+                </div>
+            </div>
+
         </div>
 
-        <!-- Test 2: Conexión a Servidor LDAP -->
-        <div class="card">
-            <h2>2. Conexión a Servidor LDAP</h2>
-            <?php
-            $LDAP_HOST = $env['LDAP_IP'] ?? '127.0.0.1';
-            $ldap_conn = @ldap_connect($LDAP_HOST);
-            
-            if ($ldap_conn) {
-                echo '<div class="status success">';
-                echo '✅ RESPONDIENDO';
-                echo '</div>';
-                echo '<div class="info">';
-                echo "Servidor LDAP: <code>$LDAP_HOST</code>";
-                echo '</div>';
-                @ldap_close($ldap_conn);
-            } else {
-                echo '<div class="status error">';
-                echo '❌ NO RESPONDE';
-                echo '</div>';
-                echo '<div class="info">';
-                echo "Servidor LDAP: <code>$LDAP_HOST</code>";
-                echo '</div>';
-            }
-            ?>
-        </div>
-
-        <!-- Test 3: Ruta al Dashboard -->
-        <div class="card">
-            <h2>3. Ruta al Dashboard (Main Server)</h2>
-            <?php
-            $ADMIN_IP = $env['ADMIN_IP'] ?? '127.0.0.1';
-            $dashboard_url = "http://$ADMIN_IP:5000";
-            echo '<div class="info">';
-            echo "URL configurada: <a href='$dashboard_url' target='_blank'>$dashboard_url</a><br>";
-            echo '<small>Nota: El Shipper usará esta ruta para enviar las alertas de Suricata.</small>';
-            echo '</div>';
-            ?>
-        </div>
+        <footer class="mt-8 text-center text-slate-400 text-xs">
+            Refresca para volver a probar. SIA Infrastructure Diagnostic Tool v2.0
+        </footer>
     </div>
 </body>
 </html>
