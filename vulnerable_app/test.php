@@ -172,7 +172,7 @@ function test_shipper($admin_ip) {
 
                     <?php if (!extension_loaded('ldap')): ?>
                         <div class="p-3 bg-orange-50 border border-orange-200 rounded text-orange-700 text-xs">
-                            Extension 'ldap' no instalada en PHP.
+                            ⚠️ Extension 'ldap' no instalada en PHP.
                         </div>
                     <?php else: 
                         $ldap_conn = @ldap_connect($ldap_ip, 389);
@@ -182,12 +182,40 @@ function test_shipper($admin_ip) {
                             $bind = @ldap_bind($ldap_conn); // Anonymous bind simple test
                     ?>
                             <div class="p-3 bg-blue-50 border border-blue-200 rounded text-blue-700 text-xs">
-                                Respondiendo a nivel de protocolo.<br>
+                                📡 Respondiendo a nivel de protocolo.<br>
                                 Anonymous Bind: <?php echo $bind ? "Habilitado" : "No permitido (Requiere credenciales)"; ?>
+                            </div>
+                            
+                            <?php
+                            // PRUEBA DE AUTENTICACIÓN REAL con usuario denis/1234
+                            $ldap_domain = $env['LDAP_DOMAIN'] ?? 'example.com';
+                            $test_user = 'denis';
+                            $test_pass = '1234';
+                            
+                            // Construir DN del usuario
+                            $domain_parts = explode('.', $ldap_domain);
+                            $dc_parts = array_map(function($part) { return "dc=$part"; }, $domain_parts);
+                            $base_dn = "ou=users," . implode(',', $dc_parts);
+                            $user_dn = "uid=$test_user,$base_dn";
+                            
+                            $auth_bind = @ldap_bind($ldap_conn, $user_dn, $test_pass);
+                            ?>
+                            
+                            <div class="mt-2 p-3 <?php echo $auth_bind ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'; ?> border rounded text-xs">
+                                <strong>🔐 Prueba de Autenticación:</strong><br>
+                                Usuario: <?php echo $test_user; ?><br>
+                                DN: <?php echo $user_dn; ?><br>
+                                Estado: <?php echo $auth_bind ? '✅ AUTENTICADO CORRECTAMENTE' : '❌ FALLO DE AUTENTICACIÓN'; ?>
+                                <?php if (!$auth_bind): ?>
+                                    <div class="mt-2 text-[10px] italic">
+                                        Verifica que el usuario exista en LDAP:<br>
+                                        <code>ldapsearch -x -b "<?php echo $base_dn; ?>" "(uid=<?php echo $test_user; ?>)"</code>
+                                    </div>
+                                <?php endif; ?>
                             </div>
                         <?php else: ?>
                             <div class="p-3 bg-red-50 border border-red-200 rounded text-red-700 text-xs">
-                                Fallo al conectar con el protocolo LDAP.
+                                ❌ Fallo al conectar con el protocolo LDAP.
                             </div>
                     <?php endif; endif; ?>
                 </div>

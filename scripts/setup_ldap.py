@@ -47,6 +47,113 @@ def check_package_installed(package_name):
     except Exception:
         return False
 
+def check_slapd_running():
+    """Verifica si el servicio slapd está corriendo"""
+    try:
+        result = subprocess.run(["systemctl", "is-active", "slapd"], 
+                              capture_output=True, text=True)
+        return result.stdout.strip() == "active"
+    except Exception:
+        return False
+
+def get_current_ldap_config():
+    """Obtiene la configuración LDAP actual desde .env"""
+    env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
+    config = {
+        "ldap_ip": None,
+        "ldap_domain": None,
+        "ldap_admin_password": None
+    }
+    
+    if os.path.exists(env_path):
+        with open(env_path, "r") as f:
+            for line in f:
+                line = line.strip()
+                if "=" in line and not line.startswith("#"):
+                    k, v = line.split("=", 1)
+                    k = k.strip()
+                    v = v.strip()
+                    if k == "LDAP_IP":
+                        config["ldap_ip"] = v
+                    elif k == "LDAP_DOMAIN":
+                        config["ldap_domain"] = v
+                    elif k == "LDAP_ADMIN_PASSWORD":
+                        config["ldap_admin_password"] = v
+    
+    return config
+
+def list_existing_ldap_users(domain, admin_password):
+    """Lista usuarios existentes en LDAP"""
+    try:
+        dc_parts = domain.split(".")
+        base_dn = ",".join([f"dc={part}" for part in dc_parts])
+        
+        result = subprocess.run(
+            ["ldapsearch", "-x", "-D", f"cn=admin,{base_dn}", "-w", admin_password,
+             "-b", f"ou=users,{base_dn}", "(objectClass=person)", "uid"],
+            capture_output=True, text=True
+        )
+        
+        if result.returncode == 0:
+            users = []
+            for line in result.stdout.split("\n"):
+                if line.startswith("uid:"):
+                    username = line.split(":", 1)[1].strip()
+                    users.append(username)
+            return users
+        return []
+    except Exception:
+        return []
+
+def detect_existing_ldap():
+    """Detecta si LDAP ya está instalado y configurado"""
+    print("\n" + "="*60)
+    print("   DETECCIÓN DE LDAP EXISTENTE")
+    print("="*60)
+    
+    # 1. Verificar si slapd está instalado
+    slapd_installed = check_package_installed("slapd")
+    print(f"\n[*] OpenLDAP Server (slapd): {'✓ INSTALADO' if slapd_installed else '✗ NO INSTALADO'}")
+    
+    # 2. Verificar si slapd está corriendo
+    if slapd_installed:
+        slapd_running = check_slapd_running()
+        print(f"[*] Servicio slapd: {'✓ ACTIVO' if slapd_running else '✗ INACTIVO'}")
+    else:
+        slapd_running = False
+    
+    # 3. Verificar configuración en .env
+    config = get_current_ldap_config()
+    has_config = config["ldap_ip"] is not None or config["ldap_domain"] is not None
+    
+    if has_config:
+        print(f"\n[*] Configuración detectada en .env:")
+        print(f"    LDAP_IP: {config['ldap_ip'] or 'NO DEFINIDA'}")
+        print(f"    LDAP_DOMAIN: {config['ldap_domain'] or 'NO DEFINIDA'}")
+        print(f"    LDAP_ADMIN_PASSWORD: {'****** (configurada)' if config['ldap_admin_password'] else 'NO DEFINIDA'}")
+        
+        # 4. Intentar listar usuarios existentes
+        if slapd_running and config["ldap_domain"] and config["ldap_admin_password"]:
+            print(f"\n[*] Intentando listar usuarios existentes...")
+            users = list_existing_ldap_users(config["ldap_domain"], config["ldap_admin_password"])
+            if users:
+                print(f"[OK] Usuarios encontrados en LDAP:")
+                for user in users:
+                    print(f"    - {user}")
+            else:
+                print("[!] No se encontraron usuarios o no se pudo acceder al directorio.")
+    else:
+        print("\n[*] No se detectó configuración previa en .env")
+    
+    print("="*60)
+    
+    return {
+        "installed": slapd_installed,
+        "running": slapd_running,
+        "has_config": has_config,
+        "config": config
+    }
+
 def install_ldap_server():
     """Instala OpenLDAP Server"""
     print("\n[*] Instalando OpenLDAP Server...")
@@ -228,7 +335,84 @@ def setup_ldap():
     local_ip = get_local_ip()
     print(f"\n[*] IP detectada: {local_ip}")
     
-    # Preguntar si desea instalar LDAP
+    # DETECCIÓN DE LDAP EXISTENTE
+    existing = detect_existing_ldap()
+    
+    # Si hay configuración existente, ofrecer opciones
+    if existing["has_config"] and existing["installed"]:
+        print("\n" + "-"*60)
+        print("   LDAP YA CONFIGURADO - OPCIONES DISPONIBLES")
+        print("-"*60)
+        print("1. Mantener configuración actual (solo verificar estado)")
+        print("2. Agregar usuarios adicionales (mantener dominio)")
+        print("3. Reconfigurar completamente (ADVERTENCIA: Borrará datos)")
+        print("4. Salir sin cambios")
+        
+        choice = input("\nSeleccione una opción (1-4): ").strip()
+        
+        if choice == "1":
+            # Solo verificar estado
+            print("\n[*] Verificando estado del servicio...")
+            if not existing["running"]:
+                print("[!] Servicio slapd no está corriendo. Iniciando...")
+                try:
+                    subprocess.run(["sudo", "systemctl", "start", "slapd"], check=True)
+                    subprocess.run(["sudo", "systemctl", "enable", "slapd"], check=True)
+                    print("[OK] Servicio slapd iniciado.")
+                except Exception as e:
+                    print(f"[!] Error al iniciar slapd: {e}")
+            else:
+                print("[OK] Servicio slapd está activo.")
+            
+            print("\n[*] Configuración actual:")
+            print(f"    LDAP_IP: {existing['config']['ldap_ip']}")
+            print(f"    LDAP_DOMAIN: {existing['config']['ldap_domain']}")
+            print("\n[*] No se realizaron cambios.")
+            return
+        
+        elif choice == "2":
+            # Agregar usuarios adicionales
+            domain = existing['config']['ldap_domain'] or input("Dominio LDAP: ")
+            admin_password = existing['config']['ldap_admin_password'] or input("Contraseña Admin LDAP: ")
+            
+            print("\n" + "-"*60)
+            print("AGREGAR USUARIOS ADICIONALES")
+            print("-"*60)
+            
+            users_to_create = []
+            while True:
+                username = input("\nNombre de usuario (Enter para terminar): ").strip()
+                if not username:
+                    break
+                password = input(f"Contraseña para {username}: ")
+                users_to_create.append((username, password))
+            
+            if users_to_create:
+                for username, password in users_to_create:
+                    create_ldap_user(domain, username, password, admin_password)
+                print("\n[OK] Usuarios agregados exitosamente.")
+            else:
+                print("\n[*] No se agregaron usuarios.")
+            return
+        
+        elif choice == "3":
+            # Reconfigurar completamente
+            print("\n[!] ADVERTENCIA: Esto borrará toda la configuración LDAP actual.")
+            confirm = input("¿Está seguro? Escriba 'SI' para continuar: ")
+            if confirm != "SI":
+                print("[*] Operación cancelada.")
+                return
+            print("[*] Procediendo con reconfiguración completa...")
+            # Continuar con configuración normal
+        
+        elif choice == "4":
+            print("[*] Saliendo sin cambios.")
+            return
+        else:
+            print("[!] Opción inválida. Saliendo.")
+            return
+    
+    # Preguntar si desea instalar LDAP (solo si no está instalado)
     if input("\n¿Desea instalar OpenLDAP Server? (s/N): ").lower() == 's':
         if not install_ldap_server():
             print("[!] Error en la instalación. Abortando.")
@@ -264,8 +448,8 @@ def setup_ldap():
     
     # Si no se ingresaron usuarios, crear uno por defecto
     if not users_to_create:
-        print("\n[*] Creando usuario por defecto: denys")
-        users_to_create.append(("denys", "denys123"))
+        print("\n[*] Creando usuario por defecto: denis")
+        users_to_create.append(("denis", "1234"))
     
     # Crear los usuarios
     for username, password in users_to_create:
@@ -298,13 +482,35 @@ def setup_ldap():
     for username, _ in users_to_create:
         print(f"  - {username}")
     
+    # Iniciar servicio slapd
+    print("\n" + "-"*60)
+    print("INICIANDO SERVICIO LDAP...")
+    print("-"*60)
+    try:
+        subprocess.run(["sudo", "systemctl", "start", "slapd"], check=True)
+        subprocess.run(["sudo", "systemctl", "enable", "slapd"], check=True)
+        print("[OK] Servicio slapd iniciado y habilitado.")
+        
+        # Verificar estado
+        result = subprocess.run(["systemctl", "is-active", "slapd"], 
+                              capture_output=True, text=True)
+        if result.stdout.strip() == "active":
+            print("[OK] Servicio slapd ACTIVO y funcionando.")
+        else:
+            print("[!] Advertencia: slapd no está activo. Verifica con: sudo systemctl status slapd")
+    except Exception as e:
+        print(f"[!] Error al iniciar slapd: {e}")
+        print("    Inicia manualmente con: sudo systemctl start slapd")
+    
     print("\n" + "-"*60)
     print("PRÓXIMOS PASOS:")
     print("-"*60)
     print("1. Verifica que slapd esté corriendo:")
     print("   sudo systemctl status slapd")
     print("\n2. Prueba la autenticación desde la web:")
-    print(f"   http://<IP_NGINX>/index.php")
+    print(f"   http://<IP_NGINX>/test.php")
+    print(f"   Usuario: {users_to_create[0][0]}")
+    print(f"   Contraseña: {users_to_create[0][1]}")
     print("\n3. Inicia el Dashboard:")
     print("   cd server_main && python3 main.py")
     print("="*60 + "\n")
