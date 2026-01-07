@@ -323,6 +323,56 @@ def diagnostico_final(role, admin_ip, nginx_ip=None, db_ip=None):
     
     print()
 
+def install_firewall_agent_service():
+    """Instala el servicio systemd para el Agente de Firewall"""
+    print(f"\n{Colors.HEADER}[*] Configurando FIREWALL AGENT (Sincronización de Bans)...{Colors.ENDC}")
+    
+    # 1. Rutas
+    repo_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    agent_src = os.path.join(repo_dir, "suricata", "firewall_agent.py")
+    agent_dst = "/usr/local/bin/firewall_agent.py"
+    
+    if not os.path.exists(agent_src):
+        print(f"{Colors.FAIL}[!] No se encuentra el archivo del agente en: {agent_src}{Colors.ENDC}")
+        return
+
+    try:
+        # 2. Copiar script
+        print(f"{Colors.OKBLUE}[*] Instalando agente en {agent_dst}...{Colors.ENDC}")
+        subprocess.run(["cp", agent_src, agent_dst], check=True)
+        subprocess.run(["chmod", "+x", agent_dst], check=True)
+        
+        # 3. Crear servicio systemd
+        service_content = f"""[Unit]
+Description=Firewall Agent - Sync Banned IPs
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/python3 {agent_dst}
+WorkingDirectory={repo_dir}
+Restart=always
+User=root
+# Variables de entorno para encontrar .env (PYTHONUNBUFFERED para ver logs en journalctl)
+Environment="PYTHONUNBUFFERED=1"
+
+[Install]
+WantedBy=multi-user.target
+"""
+        
+        with open("/etc/systemd/system/firewall-agent.service", "w") as f:
+            f.write(service_content)
+            
+        # 4. Iniciar servicio
+        subprocess.run(["systemctl", "daemon-reload"], check=True)
+        subprocess.run(["systemctl", "enable", "firewall-agent"], check=True)
+        subprocess.run(["systemctl", "restart", "firewall-agent"], check=True)
+        
+        print(f"{Colors.OKGREEN}[OK] Agente de Firewall instalado y corriendo.{Colors.ENDC}")
+        print(f"{Colors.OKGREEN}    Este servidor ahora bloqueará automáticamente las IPs de la lista negra.{Colors.ENDC}")
+        
+    except Exception as e:
+        print(f"{Colors.FAIL}[!] Error instalando el agente: {e}{Colors.ENDC}")
+
 def setup_firewall():
     """Configuración principal del firewall"""
     if os.getuid() != 0:
@@ -477,6 +527,12 @@ def setup_firewall():
     print("\n" + "="*60)
     print(f"{Colors.OKGREEN}{Colors.BOLD}   ¡FIREWALL CONFIGURADO EXITOSAMENTE!{Colors.ENDC}")
     print("="*60)
+
+    # Instalar Agente de Firewall (Opcional) - Solo para Roles 1 y 2 (DB y Nginx)
+    if choice in ['1', '2']:
+        print(f"\n{Colors.OKBLUE}[*] ¿Desea instalar el Agente de Firewall? (Sincroniza bans del Dashboard) (s/N): {Colors.ENDC}", end="")
+        if input().lower() == 's':
+            install_firewall_agent_service()
 
     # Diagnóstico final
     print(f"\n{Colors.OKBLUE}[*] ¿Desea ejecutar diagnóstico de conectividad? (s/N): {Colors.ENDC}", end="")
