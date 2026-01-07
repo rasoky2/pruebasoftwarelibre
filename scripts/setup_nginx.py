@@ -157,6 +157,39 @@ def setup_nginx():
             print(f"    Acceso: http://{server_name}")
         else:
             print("\n[!] Error en la sintaxis de Nginx. Revise la consola.")
+        
+        # Instalar el servicio PHP backend automáticamente
+        print("\n[*] Configurando servicio PHP backend...")
+        php_service_src = os.path.join(os.path.dirname(os.path.dirname(__file__)), "nginx", "php-backend.service")
+        php_service_dst = "/etc/systemd/system/php-backend.service"
+        
+        if os.path.exists(php_service_src):
+            try:
+                subprocess.run(["sudo", "cp", php_service_src, php_service_dst], check=True)
+                subprocess.run(["sudo", "systemctl", "daemon-reload"], check=True)
+                subprocess.run(["sudo", "systemctl", "enable", "php-backend"], check=True)
+                subprocess.run(["sudo", "systemctl", "restart", "php-backend"], check=True)
+                print("[OK] Servicio PHP backend instalado y activo (127.0.0.1:8000)")
+                
+                # Verificar estado
+                result = subprocess.run(["systemctl", "is-active", "php-backend"], 
+                                      capture_output=True, text=True)
+                if result.stdout.strip() == "active":
+                    print("[OK] Servicio php-backend verificado: ACTIVO")
+                else:
+                    print("[!] Advertencia: El servicio php-backend no está activo")
+                    print("    Ejecuta: sudo journalctl -u php-backend -n 50")
+            except Exception as e:
+                print(f"[!] Error instalando php-backend: {e}")
+                print("    Puedes iniciarlo manualmente con:")
+                print("    cd /var/www/html/pruebasoftwarelibre/vulnerable_app")
+                print("    php -S 127.0.0.1:8000")
+        else:
+            print(f"[!] No se encontró {php_service_src}")
+            print("    Inicia PHP manualmente:")
+            print("    cd /var/www/html/pruebasoftwarelibre/vulnerable_app")
+            print("    php -S 127.0.0.1:8000")
+
 
         if os.path.exists("nginx_temp.conf"): os.remove("nginx_temp.conf")
 
@@ -205,7 +238,7 @@ def setup_nginx():
 
 
         # 4. Actualización opcional de DB (config.php)
-        if input("\n¿Desea actualizar la IP y credenciales de la Base de Datos en config.php? (s/N): ").lower() == 's':
+        if input("\n¿Desea actualizar la IP y credenciales de la Base de Datos? (s/N): ").lower() == 's':
             # Cargar sugerencias de .env para consistencia
             env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env')
             suggested_db_ip = "127.0.0.1"
@@ -228,6 +261,63 @@ def setup_nginx():
                 "DB_PASS": db_pass
             })
             print("[OK] Configuración de Base de Datos actualizada en .env.")
+
+        # 5. Configuración de Servidor LDAP
+        if input("\n¿Desea configurar la conexión al Servidor LDAP? (s/N): ").lower() == 's':
+            # Cargar sugerencias de .env
+            env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env')
+            suggested_ldap_ip = main_server_ip  # Por defecto, mismo que el Dashboard
+            suggested_ldap_domain = "example.com"
+            
+            if os.path.exists(env_path):
+                with open(env_path, 'r') as f:
+                    for line in f:
+                        if "LDAP_IP=" in line:
+                            suggested_ldap_ip = line.split('=')[1].strip()
+                        elif "LDAP_DOMAIN=" in line:
+                            suggested_ldap_domain = line.split('=')[1].strip()
+            
+            ldap_ip = input(f"IP del Servidor LDAP [{suggested_ldap_ip}]: ") or suggested_ldap_ip
+            ldap_domain = input(f"Dominio LDAP [{suggested_ldap_domain}]: ") or suggested_ldap_domain
+            
+            # Actualizar .env
+            from setup_inventory import update_env
+            update_env({
+                "LDAP_IP": ldap_ip,
+                "LDAP_DOMAIN": ldap_domain
+            })
+            
+            # Actualizar auth_ldap.php
+            auth_ldap_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 
+                                         "vulnerable_app", "auth_ldap.php")
+            
+            if os.path.exists(auth_ldap_path):
+                try:
+                    with open(auth_ldap_path, "r") as f:
+                        content = f.read()
+                    
+                    # Actualizar IP del servidor LDAP
+                    content = re.sub(r'\$ldap_host\s*=\s*".*?";', 
+                                   f'$ldap_host = "{ldap_ip}";', content)
+                    
+                    # Actualizar base DN
+                    dc_parts = ldap_domain.split(".")
+                    base_dn = ",".join([f"dc={part}" for part in dc_parts])
+                    content = re.sub(r'\$base_dn\s*=\s*".*?";', 
+                                   f'$base_dn = "ou=users,{base_dn}";', content)
+                    
+                    with open(auth_ldap_path, "w") as f:
+                        f.write(content)
+                    
+                    print(f"[OK] auth_ldap.php actualizado:")
+                    print(f"     Servidor LDAP: {ldap_ip}")
+                    print(f"     Base DN: ou=users,{base_dn}")
+                except Exception as e:
+                    print(f"[!] Error actualizando auth_ldap.php: {e}")
+            else:
+                print(f"[!] No se encontró {auth_ldap_path}")
+            
+            print("[OK] Configuración de LDAP actualizada en .env y auth_ldap.php.")
 
         
         run_system_diagnostics(backend_ip, backend_port)

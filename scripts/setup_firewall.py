@@ -366,17 +366,14 @@ def setup_firewall():
 
     print(f"\n{Colors.OKBLUE}[*] Aplicando reglas comunes...{Colors.ENDC}")
     
-    # Reglas comunes
+    # Reglas comunes para TODOS los roles
     run_cmd("sudo iptables -A INPUT -i lo -j ACCEPT", silent=True)
     run_cmd("sudo iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT", silent=True)
     
-    # Permitir SSH desde el Admin
+    # SSH SOLO desde Admin (para administración remota)
     run_cmd(f"sudo iptables -A INPUT -p tcp -s {admin_ip} --dport 22 -j ACCEPT", silent=True)
-    print(f"{Colors.OKGREEN}[OK] SSH permitido desde Admin ({admin_ip}){Colors.ENDC}")
-    
-    # Permitir PING desde el Admin
-    run_cmd(f"sudo iptables -A INPUT -p icmp -s {admin_ip} -j ACCEPT", silent=True)
-    print(f"{Colors.OKGREEN}[OK] PING permitido desde Admin{Colors.ENDC}")
+    print(f"{Colors.OKGREEN}[OK] SSH (22) permitido SOLO desde Admin ({admin_ip}){Colors.ENDC}")
+
 
     nginx_ip = None
     db_ip = None
@@ -419,9 +416,13 @@ def setup_firewall():
         # Solicitar IP de la base de datos para diagnóstico
         db_ip = input(f"{Colors.OKBLUE}Ingrese IP del Servidor Base de Datos (para diagnóstico) [{suggested_db}]: {Colors.ENDC}") or suggested_db
         
-        # Nginx debe ser accesible para TODOS en puerto 80
+        # Nginx debe ser accesible para TODOS en puertos HTTP y HTTPS
         run_cmd("sudo iptables -A INPUT -p tcp --dport 80 -j ACCEPT", silent=True)
         print(f"{Colors.OKGREEN}[OK] HTTP (80) abierto al público{Colors.ENDC}")
+        
+        run_cmd("sudo iptables -A INPUT -p tcp --dport 443 -j ACCEPT", silent=True)
+        print(f"{Colors.OKGREEN}[OK] HTTPS (443) abierto al público{Colors.ENDC}")
+
         
         # Permitir enviar logs al Dashboard (puerto 5000)
         run_cmd(f"sudo iptables -A OUTPUT -p tcp -d {admin_ip} --dport 5000 -j ACCEPT", silent=True)

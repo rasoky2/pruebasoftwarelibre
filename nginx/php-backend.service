@@ -1,0 +1,19 @@
+[Unit]
+Description=PHP Built-in Web Server for Vulnerable App
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/var/www/html/pruebasoftwarelibre/vulnerable_app
+ExecStart=/usr/bin/php -S 127.0.0.1:8000
+Restart=always
+RestartSec=5
+
+# Logs del servicio
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=php-backend
+
+[Install]
+WantedBy=multi-user.target
