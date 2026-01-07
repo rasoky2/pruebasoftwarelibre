@@ -531,12 +531,32 @@
             badgeText = "SCAN";
           }
 
+          // Lógica para diferenciar auditoría DB vs Ataques reales
+          let rowClass =
+            "border-b bg-red-50/20 hover:bg-red-50 transition-colors";
+          let alertTextClass = "text-red-700";
+
+          // Si es un acceso a DB, verificamos si viene de Nginx (tráfico legítimo)
+          if (badgeText === "DB ACCESS") {
+            const nginxIP = document
+              .getElementById("nginxIP")
+              ?.innerText?.split("|")[0]
+              ?.trim()
+              ?.replace("IP: ", "");
+            if (src_ip === nginxIP) {
+              // Es Nginx accediendo a la DB => Tráfico normal
+              rowClass =
+                "border-b bg-emerald-50/20 hover:bg-emerald-50 transition-colors";
+              alertTextClass = "text-emerald-700";
+            }
+          }
+
           const badge = `<span class="px-1.5 py-0.5 ${badgeColor} rounded text-[9px] font-bold uppercase">${badgeText}</span>`;
 
           const row = document.createElement("tr");
-          row.className =
-            "border-b bg-red-50/20 hover:bg-red-50 transition-colors";
-          row.innerHTML = `<td class="p-3 font-mono text-[10px]">${time}</td><td class="p-3">${badge}<div class="font-bold text-red-700 text-[10px] mt-1">${signature}</div></td><td class="p-3 font-mono text-[10px] text-slate-600">${src_ip}</td><td class="p-3"><button onclick="banPerson('${src_ip}')" class="px-2 py-0.5 bg-red-600 text-white text-[9px] rounded font-bold">BAN</button></td>`;
+          row.className = rowClass;
+          // Se usa la clase dinámica alertTextClass en vez de la fija text-red-700
+          row.innerHTML = `<td class="p-3 font-mono text-[10px]">${time}</td><td class="p-3">${badge}<div class="font-bold ${alertTextClass} text-[10px] mt-1">${signature}</div></td><td class="p-3 font-mono text-[10px] text-slate-600">${src_ip}</td><td class="p-3"><button onclick="banPerson('${src_ip}')" class="px-2 py-0.5 bg-red-600 text-white text-[9px] rounded font-bold">BAN</button></td>`;
           document.getElementById("dbTableBody").prepend(row);
         } else if (data.event_type === "app_event") {
           // --- LOG DE LA APLICACIÓN (PHP) ---

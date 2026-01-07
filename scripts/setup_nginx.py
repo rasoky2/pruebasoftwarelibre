@@ -228,7 +228,6 @@ def setup_nginx():
             # Instalar dependencia para métricas de sistema (CPU/RAM) solo si no existe
             if not check_package_installed("python3-psutil"):
                 print("[*] Instalando dependencias de monitoreo...")
-                subprocess.run(["sudo", "apt", "update"], check=False)
                 subprocess.run(["sudo", "apt", "install", "-y", "python3-psutil"], check=False)
             else:
                 print("[OK] Dependencias de monitoreo ya presentes.")
