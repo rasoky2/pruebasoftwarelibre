@@ -172,4 +172,4 @@ if (isset($_POST['ldap_login'])) {
         header("Location: index.php?error=ldap_failed");
     }
 }
-?>
+

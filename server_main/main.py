@@ -58,8 +58,6 @@ def save_config(config):
 
 current_config = load_config()
 
-# --- API DE BLOQUEO (FIREWALL REMOTO) ---
-
 # --- API DE BLOQUEO (FIREWALL LOCAL) ---
 
 @app.route('/api/ban', methods=['POST'])
@@ -119,6 +117,61 @@ def manage_config():
     config_with_health['health'] = sensors_health
     return jsonify(config_with_health)
 
+def update_health_status(data, sensor_ip):
+    """Actualiza el estado de salud de los sensores basándose en los datos recibidos"""
+    stype = data.get('sensor_type')
+    
+    # Determinar target (por defecto nginx, o db si se especifica)
+    target = 'db' if stype == 'database' else 'nginx'
+    
+    # Fallback: Si no hay sensor_type, intentar deducir por IP
+    if not stype:
+        if sensor_ip == current_config['db_ip'].strip():
+            target = 'db'
+        elif sensor_ip == current_config['nginx_ip'].strip():
+            target = 'nginx'
+            
+    # Actualizar estado
+    sensors_health[target].update({
+        'status': "ONLINE",
+        'last_seen': datetime.now().strftime('%H:%M:%S'),
+        'ip': sensor_ip
+    })
+    
+    # Actualizar métricas si existen
+    if 'metrics' in data:
+        sensors_health[target]['metrics'] = data['metrics']
+
+def _print_alert_info(data, sensor_ip):
+    """Imprime información detallada de alertas en consola"""
+    alert = data.get('alert', {})
+    signature = alert.get('signature', '')
+    src_ip = data.get('src_ip')
+    
+    is_db_access = "DATABASE" in signature.upper() or "MYSQL" in signature.upper()
+    nginx_ip = sensors_health['nginx']['ip'] or current_config['nginx_ip'].strip()
+    
+    if is_db_access and src_ip == nginx_ip:
+            print(f"{Colors.OKBLUE}[INFO] Acceso Legítimo a DB desde Nginx ({src_ip}){Colors.ENDC}")
+    else:
+        print(f"\n{Colors.FAIL}[!] ALERTA DESDE {sensor_ip} [!]{Colors.ENDC}")
+        print(f"Ataque: {signature} | Atacante: {src_ip}")
+
+def handle_event_logging(data, sensor_ip):
+    """Procesa el log, lo almacena y muestra output correspondiente"""
+    event_type = data.get('event_type')
+    
+    if not event_type:
+        print(f"{Colors.OKBLUE}[H] Heartbeat manual de {sensor_ip} recibido.{Colors.ENDC}")
+        return
+
+    logs_storage.append(data)
+    
+    if event_type == 'alert':
+        _print_alert_info(data, sensor_ip)
+    elif event_type == 'stats':
+        print(f"{Colors.OKGREEN}[H] Heartbeat de Suricata ({sensor_ip}) recibido.{Colors.ENDC}")
+
 @app.route('/api/heartbeat', methods=['POST'])
 @app.route('/', methods=['POST'])
 def receive_suricata_log():
@@ -130,61 +183,11 @@ def receive_suricata_log():
         sensor_ip = request.remote_addr
         data['sensor_source'] = sensor_ip
 
-        # DEBUG: Ver qué IP llega
-        # print(f"DEBUG: Heartbeat/Log desde {sensor_ip}")
+        # 1. Actualizar Salud
+        update_health_status(data, sensor_ip)
 
-        # Identificar el objetivo (db o nginx)
-        stype = data.get('sensor_type')
-        target = 'db' if stype == 'database' else 'nginx'
-
-        # Actualizar información base
-        sensors_health[target].update({
-            'status': "ONLINE",
-            'last_seen': datetime.now().strftime('%H:%M:%S'),
-            'ip': sensor_ip
-        })
-
-        # Solo actualizar métricas si el paquete las trae (evita resetear a 0 en alertas)
-        if 'metrics' in data:
-            sensors_health[target]['metrics'] = data['metrics']
-        
-        # Si es una alerta, no hace falta buscar por IP, ya sabemos el target
-        if data.get('event_type') == 'alert':
-            pass # Ya actualizado arriba
-        
-        # Caso 3: Fallback por IP (Si no hay sensor_type y no es alerta)
-        elif not stype:
-            target_db = current_config['db_ip'].strip()
-            target_nginx = current_config['nginx_ip'].strip()
-
-            if sensor_ip == target_db:
-                sensors_health['db']['ip'] = sensor_ip
-            elif sensor_ip == target_nginx:
-                sensors_health['nginx']['ip'] = sensor_ip
-
-        # Guardar el log si tiene tipo de evento
-        if data.get('event_type'):
-            logs_storage.append(data)
-            if data.get('event_type') == 'alert':
-                alert = data.get('alert', {})
-                signature = alert.get('signature', '')
-                src_ip = data.get('src_ip')
-                
-                # Verificar si es tráfico legítimo (Nginx -> DB)
-                is_db_access = "DATABASE" in signature.upper() or "MYSQL" in signature.upper()
-                # Usar la IP dinámica reportada por el sensor, o fallback a la config estática
-                nginx_ip = sensors_health['nginx']['ip'] or current_config['nginx_ip'].strip()
-                
-                if is_db_access and src_ip == nginx_ip:
-                     print(f"{Colors.OKBLUE}[INFO] Acceso Legítimo a DB desde Nginx ({src_ip}){Colors.ENDC}")
-                else:
-                    print(f"\n{Colors.FAIL}[!] ALERTA DESDE {sensor_ip} [!]{Colors.ENDC}")
-                    print(f"Ataque: {signature} | Atacante: {src_ip}")
-            elif data.get('event_type') == 'stats':
-                print(f"{Colors.OKGREEN}[H] Heartbeat de Suricata ({sensor_ip}) recibido.{Colors.ENDC}")
-        else:
-            # Heartbeat genérico (desde test.php o script simple)
-            print(f"{Colors.OKBLUE}[H] Heartbeat manual de {sensor_ip} recibido.{Colors.ENDC}")
+        # 2. Procesar Logs y Alertas
+        handle_event_logging(data, sensor_ip)
 
         return jsonify({"status": "success"}), 200
     except Exception as e:
