@@ -13,6 +13,19 @@ def get_local_ip():
     except Exception:
         return "127.0.0.1"
 
+def load_env():
+    """Lee el archivo .env y devuelve un diccionario con las variables"""
+    env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
+    env_data = {}
+    if os.path.exists(env_path):
+        with open(env_path, "r") as f:
+            for line in f:
+                line = line.strip()
+                if "=" in line and not line.startswith("#"):
+                    k, v = line.split("=", 1)
+                    env_data[k.strip()] = v.strip()
+    return env_data
+
 def update_env(updates):
     """
     Actualiza el archivo .env con las claves proporcionadas.
