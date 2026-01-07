@@ -234,8 +234,17 @@ def setup_nginx():
             
             if os.path.exists(shipper_service_src):
                 try:
-                    # Copiar y activar servicio
-                    subprocess.run(["sudo", "cp", shipper_service_src, shipper_service_dst], check=True)
+                    # Detectar ruta actual del proyecto de forma dinámica
+                    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                    suricata_dir = os.path.join(project_root, "suricata")
+                    
+                    # Leer y parchear Log Shipper
+                    with open(shipper_service_src, 'r') as f: content = f.read()
+                    content = content.replace("/var/www/html/pruebasoftwarelibre/suricata", suricata_dir)
+                    temp_shipper = "/tmp/log-shipper-nginx.service"
+                    with open(temp_shipper, 'w') as f: f.write(content)
+                    
+                    subprocess.run(["sudo", "cp", temp_shipper, shipper_service_dst], check=True)
                     subprocess.run(["sudo", "systemctl", "daemon-reload"], check=True)
                     subprocess.run(["sudo", "systemctl", "enable", "log-shipper"], check=True)
                     subprocess.run(["sudo", "systemctl", "restart", "log-shipper"], check=True)

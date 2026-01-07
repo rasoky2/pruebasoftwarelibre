@@ -257,36 +257,52 @@ def setup_db_config():
         service_dst = "/etc/systemd/system/log-shipper.service"
 
         if os.path.exists(service_src):
-            subprocess.run(["sudo", "cp", service_src, service_dst], check=True)
-            subprocess.run(["sudo", "systemctl", "daemon-reload"], check=True)
-            subprocess.run(["sudo", "systemctl", "enable", "log-shipper"], check=True)
-            subprocess.run(["sudo", "systemctl", "restart", "log-shipper"], check=True)
-            print("[OK] Log Shipper de Seguridad activo en DB.")
-    
+            try:
+                # Detectar ruta actual del proyecto de forma dinámica
+                project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                scripts_dir = os.path.join(project_root, "scripts")
+                suricata_dir = os.path.join(project_root, "suricata")
+                
+                # Leer y parchear Log Shipper
+                with open(service_src, 'r') as f: content = f.read()
+                content = content.replace("/var/www/html/pruebasoftwarelibre/suricata", suricata_dir)
+                temp_shipper = "/tmp/log-shipper.service"
+                with open(temp_shipper, 'w') as f: f.write(content)
+                
+                subprocess.run(["sudo", "cp", temp_shipper, service_dst], check=True)
+                subprocess.run(["sudo", "systemctl", "daemon-reload"], check=True)
+                subprocess.run(["sudo", "systemctl", "enable", "log-shipper"], check=True)
+                subprocess.run(["sudo", "systemctl", "restart", "log-shipper"], check=True)
+                print("[OK] Log Shipper de Seguridad activo en DB con ruta detectada.")
+            except Exception as e:
+                print(f"[!] Error instalando log-shipper: {e}")
+
     # 7. Instalación del Servicio Heartbeat (Python)
     if input("\n¿Desea instalar/actualizar el servicio de latido (Heartbeat) para el Dashboard? (s/N): ").lower() == 's':
         print("[*] Configurando servicio db-heartbeat...")
         
-        # Instalar dependencia para métricas de sistema (CPU/RAM) solo si no existe
-        if not check_package_installed("python3-psutil"):
-            print("[*] Instalando dependencias de monitoreo...")
-            subprocess.run(["sudo", "apt", "update"], check=False)
-            subprocess.run(["sudo", "apt", "install", "-y", "python3-psutil"], check=False)
-        else:
-            print("[OK] Dependencias de monitoreo ya presentes.")
+        # ... (instalación de psutil ya optimizada arriba) ...
         
         service_src = os.path.join(os.path.dirname(os.path.dirname(__file__)), "mysql", "db-heartbeat.service")
         service_dst = "/etc/systemd/system/db-heartbeat.service"
         
         if os.path.exists(service_src):
             try:
-                subprocess.run(["sudo", "cp", service_src, service_dst], check=True)
+                project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                scripts_dir = os.path.join(project_root, "scripts")
+                
+                with open(service_src, 'r') as f: content = f.read()
+                content = content.replace("/var/www/html/pruebasoftwarelibre/scripts", scripts_dir)
+                temp_db = "/tmp/db-heartbeat.service"
+                with open(temp_db, 'w') as f: f.write(content)
+
+                subprocess.run(["sudo", "cp", temp_db, service_dst], check=True)
                 subprocess.run(["sudo", "systemctl", "daemon-reload"], check=True)
                 subprocess.run(["sudo", "systemctl", "enable", "db-heartbeat"], check=True)
                 subprocess.run(["sudo", "systemctl", "restart", "db-heartbeat"], check=True)
-                print("[OK] Servicio db-heartbeat configurado y REINICIADO.")
+                print("[OK] Servicio db-heartbeat configurado con ruta detectada.")
             except Exception as e:
-                print(f"[!] Error instalando servicio: {e}")
+                print(f"[!] Error instalando servicio db-heartbeat: {e}")
         else:
             print(f"[!] No se encontró {service_src}. Saltando instalación de servicio.")
 
