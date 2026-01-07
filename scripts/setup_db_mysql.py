@@ -223,10 +223,16 @@ def setup_db_config():
     print("   MONITOREO DE SEGURIDAD (Suricata IDS)")
     print("="*50)
     if input("¿Desea instalar y configurar Suricata IDS en el servidor de DB? (s/N): ").lower() == 's':
-        # Importar funciones de instalación/configuración de Suricata si están disponibles o definirlas
-        print("[*] Instalando Suricata en Servidor Database...")
-        subprocess.run(["sudo", "apt", "update"], check=False)
-        subprocess.run(["sudo", "apt", "install", "-y", "suricata", "python3-psutil"], check=False)
+        if not check_package_installed("suricata"):
+            print("[*] Instalando Suricata en Servidor Database...")
+            subprocess.run(["sudo", "apt", "update"], check=False)
+            subprocess.run(["sudo", "apt", "install", "-y", "suricata"], check=False)
+        else:
+            print("[OK] Suricata ya está instalado.")
+        
+        # Asegurar psutil
+        if not check_package_installed("python3-psutil"):
+            subprocess.run(["sudo", "apt", "install", "-y", "python3-psutil"], check=False)
         
         # Configurar Suricata (usamos una versión simplificada de la lógica de nginx)
         local_ip = get_local_ip()
