@@ -119,8 +119,10 @@ def configure_suricata(main_server_ip):
             
             # Incluir local.rules
             if "rule-files:" in content:
-                if "local.rules" not in content:
-                    content = content.replace("rule-files:", f"rule-files:\n  - {local_rules_dst}")
+                if "local.rules" not in content and local_rules_dst not in content:
+                    # Usamos regex para insertar respetando indentación básica
+                    # Buscamos "rule-files:" seguido de salto de línea
+                    content = re.sub(r'rule-files:\s*\n', f'rule-files:\n  - {local_rules_dst}\n', content)
             
             # Guardar en temporal
             temp_yml = "/tmp/suricata.yaml"

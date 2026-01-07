@@ -542,7 +542,7 @@
           // Si es un acceso a DB, verificamos si viene de Nginx (tráfico legítimo)
           if (badgeText === "DB ACCESS") {
             const nginxIP = document
-              .getElementById("nginxIP")
+              .getElementById("nginxLastSeen")
               ?.innerText?.split("|")[0]
               ?.trim()
               ?.replace("IP: ", "");

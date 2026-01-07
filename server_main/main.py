@@ -172,7 +172,8 @@ def receive_suricata_log():
                 
                 # Verificar si es tráfico legítimo (Nginx -> DB)
                 is_db_access = "DATABASE" in signature.upper() or "MYSQL" in signature.upper()
-                nginx_ip = current_config['nginx_ip'].strip()
+                # Usar la IP dinámica reportada por el sensor, o fallback a la config estática
+                nginx_ip = sensors_health['nginx']['ip'] or current_config['nginx_ip'].strip()
                 
                 if is_db_access and src_ip == nginx_ip:
                      print(f"{Colors.OKBLUE}[INFO] Acceso Legítimo a DB desde Nginx ({src_ip}){Colors.ENDC}")
