@@ -250,6 +250,30 @@ def setup_db_config():
             subprocess.run(["sudo", "cp", rules_src, rules_dst], check=True)
             print("[OK] Reglas de seguridad copiadas.")
 
+        # Parchear suricata.yaml para incluir las reglas y el HOME_NET
+        if os.path.exists(suricata_yaml):
+            try:
+                with open(suricata_yaml, "r") as f: content = f.read()
+                
+                # Configurar HOME_NET
+                content = re.sub(r'HOME_NET: "\[.*?\]"', f'HOME_NET: "[{local_ip}/32]"', content)
+                
+                # Asegurar que incluya local.rules
+                if "rule-files:" in content:
+                    if "local.rules" not in content:
+                        content = content.replace("rule-files:", f"rule-files:\n  - {rules_dst}")
+                
+                # Guardar cambios (usando sudo para escribir en /etc)
+                with open("/tmp/suricata.yaml", "w") as f: f.write(content)
+                subprocess.run(["sudo", "cp", "/tmp/suricata.yaml", suricata_yaml], check=True)
+                
+                subprocess.run(["sudo", "systemctl", "restart", "suricata"], check=True)
+                print(f"[OK] Suricata configurado y reiniciado (HOME_NET: {local_ip})")
+            except Exception as e:
+                print(f"[!] Error configurando suricata.yaml: {e}")
+        else:
+            print("[!] No se encontró /etc/suricata/suricata.yaml. ¿Está instalado?")
+
         # Configurar el Log Shipper para la DB
         print("[*] Instalando Log Shipper para Database...")
         shipper_src = os.path.join(os.path.dirname(os.path.dirname(__file__)), "suricata", "log_shipper.py")
