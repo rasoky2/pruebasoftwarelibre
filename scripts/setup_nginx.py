@@ -121,18 +121,18 @@ def configure_suricata(main_server_ip):
             # 1. Ajustar default-rule-path
             content = re.sub(r'default-rule-path:.*', 'default-rule-path: /etc/suricata/rules', content)
             
-            # 2. Reemplazar toda la sección rule-files para evitar problemas de indentación
-            # Buscamos desde rule-files: hasta la siguiente clave principal (que empieza sin indentación)
-            new_rules_block = f"""rule-files:
-  - {local_rules_dst}
-  - suricata.rules
-"""
-            # Regex: busca 'rule-files:' seguido de cualquier cosa hasta encontrar una línea que empiece por letra (nueva clave) o fin de archivo
-            content = re.sub(r'rule-files:(?:.*\n)+?(?=[a-z]|$)', new_rules_block, content, flags=re.MULTILINE)
+            # 2. Reemplazar toda la sección rule-files
+            # Regex robusta: busca "rule-files:" seguido de líneas identadas hasta encontrar una línea que NO empiece por espacio (nueva clave o fin)
+            # El uso de [\s\S] asegura que coincida con saltos de línea también.
             
-            # Si el regex no encontró nada (caso raro), hacemos append al final
-            if "rule-files:" not in content:
-                 content += f"\n{new_rules_block}"
+            # Definimos el bloque limpio
+            clean_block = f"rule-files:\n  - {os.path.basename(local_rules_dst)}\n  - suricata.rules\n"
+            
+            # Intentamos reemplazo
+            if "rule-files:" in content:
+                content = re.sub(r'^rule-files:[\s\S]*?(?=\n\S|\Z)', clean_block, content, flags=re.MULTILINE)
+            else:
+                 content += f"\n{clean_block}"
             
             # Guardar en temporal
             temp_yml = "/tmp/suricata.yaml"
