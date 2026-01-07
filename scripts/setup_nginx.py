@@ -117,22 +117,22 @@ def configure_suricata(main_server_ip):
             # HOME_NET
             content = re.sub(r'HOME_NET: "\[.*?\]"', f'HOME_NET: "[{local_ip}/32]"', content)
             
-            # Incluir local.rules
-            # Incluir local.rules
-            if "rule-files:" in content:
-                if "local.rules" not in content and local_rules_dst not in content:
-                    # Intento inteligente: detectar indentación del primer item existente
-                    match = re.search(r'(rule-files:.*?\n)(\s*)-', content)
-                    if match:
-                        # Encontramos la lista y su indentación
-                        prefix = match.group(1)
-                        indent = match.group(2)
-                        # Reconstruimos: "rule-files:\n" + "  - local.rules\n" + "  -" (inicio del siguiente)
-                        replacement = f"{prefix}{indent}- {local_rules_dst}\n{indent}-"
-                        content = content.replace(match.group(0), replacement, 1)
-                    else:
-                        # Fallback simple si la lista está vacía o formato raro (asumimos standard)
-                        content = re.sub(r'rule-files:\s*\n', f'rule-files:\n  - {local_rules_dst}\n', content)
+            # Incluir local.rules de forma segura y directa
+            # 1. Ajustar default-rule-path
+            content = re.sub(r'default-rule-path:.*', 'default-rule-path: /etc/suricata/rules', content)
+            
+            # 2. Reemplazar toda la sección rule-files para evitar problemas de indentación
+            # Buscamos desde rule-files: hasta la siguiente clave principal (que empieza sin indentación)
+            new_rules_block = f"""rule-files:
+  - {local_rules_dst}
+  - suricata.rules
+"""
+            # Regex: busca 'rule-files:' seguido de cualquier cosa hasta encontrar una línea que empiece por letra (nueva clave) o fin de archivo
+            content = re.sub(r'rule-files:(?:.*\n)+?(?=[a-z]|$)', new_rules_block, content, flags=re.MULTILINE)
+            
+            # Si el regex no encontró nada (caso raro), hacemos append al final
+            if "rule-files:" not in content:
+                 content += f"\n{new_rules_block}"
             
             # Guardar en temporal
             temp_yml = "/tmp/suricata.yaml"
