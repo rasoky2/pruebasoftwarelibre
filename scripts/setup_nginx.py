@@ -161,6 +161,12 @@ def configure_suricata(main_server_ip):
                     # Si no existe la etiqueta (raro), la añadimos al final
                     content += f"\nrule-files:\n  - {os.path.basename(local_rules_dst)}\n"
 
+            # 4. FIX: Verificar si suricata.rules existe realmente, si no, comentar la línea para evitar errores
+            extra_rules_path = "/etc/suricata/rules/suricata.rules"
+            if not os.path.exists(extra_rules_path):
+                print("[DEBUG] suricata.rules no encontrado, comentando referencia para evitar crash...")
+                content = content.replace("- suricata.rules", "# - suricata.rules")
+
             # Guardar en temporal
             temp_yml = "/tmp/suricata.yaml"
             with open(temp_yml, "w") as f: f.write(content)
