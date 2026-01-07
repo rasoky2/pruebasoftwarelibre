@@ -198,7 +198,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 <span class="p-1 rounded bg-gray-100">🚀</span> Bypass SQL Injection (Solo Tradicional)
             </button>
             <div class="text-[10px] text-gray-500 text-center">
-                Infraestructura vinculada: MySQL Remoto (1.57) | LDAP Agustín (1.161)
+                Infraestructura vinculada: MySQL Remoto (<?php echo $DB_HOST; ?>) | LDAP Corporativo (<?php echo $LDAP_HOST; ?>)
             </div>
         </div>
     </div>

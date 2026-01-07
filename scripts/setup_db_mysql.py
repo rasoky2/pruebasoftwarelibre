@@ -168,30 +168,29 @@ def setup_db_config():
 
     local_ip = get_local_ip()
     if db_host in ["127.0.0.1", "localhost", local_ip]:
-        # 2. Configurar MySQL para red
+        # 2. Configurar MySQL para red (Escuchar en todas las interfaces)
         configure_mysql_network()
         
-        # 3. Crear base de datos y usuarios
+        # 3. Crear base de datos y usuarios con PRIVILEGIOS LIBRES (%)
+        print(f"[*] Configurando privilegios libres para {db_user}...")
         sql_cmd = f"CREATE DATABASE IF NOT EXISTS {db_name}; " \
                   f"CREATE USER IF NOT EXISTS '{db_user}'@'%' IDENTIFIED BY '{db_pass}'; " \
                   f"CREATE USER IF NOT EXISTS '{db_user}'@'localhost' IDENTIFIED BY '{db_pass}'; " \
-                  f"CREATE USER IF NOT EXISTS '{db_user}'@'127.0.0.1' IDENTIFIED BY '{db_pass}'; " \
                   f"GRANT ALL PRIVILEGES ON {db_name}.* TO '{db_user}'@'%'; " \
                   f"GRANT ALL PRIVILEGES ON {db_name}.* TO '{db_user}'@'localhost'; " \
-                  f"GRANT ALL PRIVILEGES ON {db_name}.* TO '{db_user}'@'127.0.0.1'; " \
                   f"ALTER USER '{db_user}'@'%' IDENTIFIED WITH mysql_native_password BY '{db_pass}'; " \
                   f"FLUSH PRIVILEGES;"
         try:
             subprocess.run(["sudo", "mysql", "-e", sql_cmd], check=True)
-            print("[OK] Base de datos y usuarios configurados.")
+            print("[OK] Base de datos y usuarios con privilegios '%' configurados.")
         except Exception as e:
-            print(f"[!] Error configurando MySQL: {e}")
+            print(f"[!] Error configurando privilegios MySQL: {e}")
 
         # 4. Cargar esquema de la base de datos
         if input("\n¿Desea cargar el esquema de la base de datos (tablas y datos)? (s/N): ").lower() == 's':
             load_database_schema(db_name)
 
-        # 5. Reiniciar MySQL para aplicar cambios
+        # 5. Reiniciar MySQL para aplicar bind-address = 0.0.0.0
         restart_mysql()
 
     # 6. Actualizar .env (ÚNICA FUENTE DE VERDAD)
