@@ -119,39 +119,50 @@ def manage_config():
     config_with_health['health'] = sensors_health
     return jsonify(config_with_health)
 
+@app.route('/api/heartbeat', methods=['POST'])
 @app.route('/', methods=['POST'])
 def receive_suricata_log():
     try:
         data = request.json
         if not data:
-            return jsonify({"status": "error"}), 400
+            return jsonify({"status": "error", "message": "No data received"}), 400
 
         sensor_ip = request.remote_addr
         data['sensor_source'] = sensor_ip
 
+        # DEBUG: Ver qué IP llega
+        # print(f"DEBUG: Heartbeat/Log desde {sensor_ip}")
+
         # Identificar y Actualizar Salud del Sensor
-        # Verificamos si la IP coincide con la configurada en .env
-        if sensor_ip == current_config['db_ip']:
+        # Comparamos quitando posibles espacios
+        target_db = current_config['db_ip'].strip()
+        target_nginx = current_config['nginx_ip'].strip()
+
+        if sensor_ip == target_db:
             sensors_health['db']['status'] = "ONLINE"
             sensors_health['db']['last_seen'] = datetime.now().strftime('%H:%M:%S')
             sensors_health['db']['ip'] = sensor_ip
-        elif sensor_ip == current_config['nginx_ip']:
+        elif sensor_ip == target_nginx:
             sensors_health['nginx']['status'] = "ONLINE"
             sensors_health['nginx']['last_seen'] = datetime.now().strftime('%H:%M:%S')
             sensors_health['nginx']['ip'] = sensor_ip
 
-        logs_storage.append(data)
+        # Si es un log de Suricata, lo guardamos
+        if data.get('event_type'):
+            logs_storage.append(data)
+            if data.get('event_type') == 'alert':
+                alert = data.get('alert', {})
+                print(f"\n{Colors.FAIL}[!] ALERTA DESDE {sensor_ip} [!]{Colors.ENDC}")
+                print(f"Ataque: {alert.get('signature')} | Atacante: {data.get('src_ip')}")
+            elif data.get('event_type') == 'stats':
+                print(f"{Colors.OKGREEN}[H] Heartbeat de Suricata ({sensor_ip}) recibido.{Colors.ENDC}")
+        else:
+            # Heartbeat genérico (desde test.php o script simple)
+            print(f"{Colors.OKBLUE}[H] Heartbeat manual de {sensor_ip} recibido.{Colors.ENDC}")
 
-        if data.get('event_type') == 'alert':
-            alert = data.get('alert', {})
-            print(f"\n{Colors.FAIL}[!] ALERTA DESDE {sensor_ip} [!]{Colors.ENDC}")
-            print(f"Ataque: {alert.get('signature')} | Atacante: {data.get('src_ip')}")
-        
-        elif data.get('event_type') == 'stats':
-            print(f"{Colors.OKGREEN}[H] Heartbeat de {sensor_ip} recibido.{Colors.ENDC}")
-            
         return jsonify({"status": "success"}), 200
     except Exception as e:
+        print(f"Error en receive_suricata_log: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 if __name__ == '__main__':
