@@ -112,44 +112,125 @@ def configure_suricata(main_server_ip):
     # 2. Configurar suricata.yaml
     if os.path.exists(suricata_yaml):
         try:
-            with open(suricata_yaml, "r") as f: content = f.read()
+            # --- CONFIGURACIÓN SEGURA V4 (TABULA RASA) ---
+            print("[DEBUG] V4: Sobreescribiendo suricata.yaml con configuración limpia...")
             
-            # HOME_NET
-            content = re.sub(r'HOME_NET: "\[.*?\]"', f'HOME_NET: "[{local_ip}/32]"', content)
+            # Backup por seguridad
+            if os.path.exists(suricata_yaml):
+                subprocess.run(["sudo", "cp", suricata_yaml, f"{suricata_yaml}.bak_setup"], check=False)
             
-            # Incluir local.rules de forma segura y directa
-            # 1. Ajustar default-rule-path
-            content = re.sub(r'default-rule-path:.*', 'default-rule-path: /etc/suricata/rules', content)
-            
-            # --- CONFIGURACIÓN SEGURA V3 (Filtrado Agresivo) ---
-            print("[DEBUG] V3: Limpiando suricata.yaml por filtrado directo...")
-            
-            lines = content.splitlines()
-            cleaned_lines = []
-            
-            # Filtro simple: Si la línea menciona 'rule-files' o termina en '.rules', la matamos.
-            # Esto es más seguro que intentar parsear indentaciones con regex en un archivo desconocido.
-            for line in lines:
-                if "rule-files:" in line:
-                    continue
-                if line.strip().endswith(".rules"):
-                    continue
-                if line.strip() == "-": # Posibles guiones huerfanos de listas
-                    continue
-                    
-                cleaned_lines.append(line)
+            # Contenido YAML minimalista y garantizado de funcionar
+            minimal_yaml = f"""%YAML 1.1
+---
+# Configuracion Auto-Generada por Setup Script
+vars:
+  address-groups:
+    HOME_NET: "[{local_ip}/32]"
+    EXTERNAL_NET: "!$HOME_NET"
+    HTTP_SERVERS: "$HOME_NET"
+    SMTP_SERVERS: "$HOME_NET"
+    SQL_SERVERS: "$HOME_NET"
+    DNS_SERVERS: "$HOME_NET"
+    TELNET_SERVERS: "$HOME_NET"
+    AIM_SERVERS: "$any"
+    DC_SERVERS: "$HOME_NET"
+    DNP3_SERVER: "$HOME_NET"
+    DNP3_CLIENT: "$HOME_NET"
+    MODBUS_CLIENT: "$HOME_NET"
+    MODBUS_SERVER: "$HOME_NET"
+    ENIP_CLIENT: "$HOME_NET"
+    ENIP_SERVER: "$HOME_NET"
 
-            # Reconstruir contenido
-            content = "\n".join(cleaned_lines)
-            
-            # Añadir el bloque nuevo al final
-            new_rules_block = f"""
-# --- Reglas inyectadas por Setup Script ---
+  port-groups:
+    HTTP_PORTS: "80"
+    SHELLCODE_PORTS: "!80"
+    ORACLE_PORTS: 1521
+    SSH_PORTS: 22
+    DNP3_PORTS: 20000
+    MODBUS_PORTS: 502
+    FILE_DATA_PORTS: "[$HTTP_PORTS,110,143]"
+    FTP_PORTS: 21
+    GENEVE_PORTS: 6081
+    VXLAN_PORTS: 4789
+    TEREDO_PORTS: 3544
+
+default-rule-path: /etc/suricata/rules
+
 rule-files:
-  - {local_rules_dst}
+  - {os.path.basename(local_rules_dst)}
   - suricata.rules
+
+classification-file: /etc/suricata/classification.config
+reference-config-file: /etc/suricata/reference.config
+
+outputs:
+  - fast:
+      enabled: yes
+      filename: fast.log
+      append: yes
+  - eve-log:
+      enabled: yes
+      filetype: regular
+      filename: eve.json
+      types:
+        - alert
+        - http:
+            extended: yes
+        - dns
+        - tls:
+            extended: yes
+        - files:
+            force-magic: yes
+        - smtp
+        - ssh
+      
+af-packet:
+  - interface: default
+    threads: auto
+    cluster-id: 99
+    cluster-type: cluster_flow
+    defrag: yes
+
+app-layer:
+  protocols:
+    krb5:
+      enabled: yes
+    ikev2:
+      enabled: yes
+    tls:
+      enabled: yes
+      detection-ports:
+        dp: 443
+    dcerpc:
+      enabled: yes
+    ftp:
+      enabled: yes
+    ssh:
+      enabled: yes
+    smtp:
+      enabled: yes
+    imap:
+      enabled: yes
+    modbus:
+      enabled: yes
+    dnp3:
+      enabled: yes
+    enip:
+      enabled: yes
+    nfs:
+      enabled: yes
+    dns:
+      tcp:
+        enabled: yes
+        detection-ports:
+          dp: 53
+      udp:
+        enabled: yes
+        detection-ports:
+          dp: 53
+
 """
-            content += new_rules_block
+            content = minimal_yaml
             
             # Guardar en temporal
             temp_yml = "/tmp/suricata.yaml"
