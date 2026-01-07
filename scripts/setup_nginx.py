@@ -4,7 +4,6 @@ import socket
 import subprocess
 import json
 import requests
-
 import re
 
 def get_local_ip():
@@ -132,7 +131,7 @@ vars:
     SQL_SERVERS: "$HOME_NET"
     DNS_SERVERS: "$HOME_NET"
     TELNET_SERVERS: "$HOME_NET"
-    AIM_SERVERS: "$any"
+    AIM_SERVERS: "any"
     DC_SERVERS: "$HOME_NET"
     DNP3_SERVER: "$HOME_NET"
     DNP3_CLIENT: "$HOME_NET"
