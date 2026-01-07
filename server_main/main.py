@@ -152,9 +152,11 @@ def receive_suricata_log():
                 'ip': sensor_ip,
                 'metrics': metrics
             })
-        # Caso 2: Alertas de Suricata (siempre vienen del nodo perimetral/nginx)
+        # Caso 2: Alertas de Suricata (ahora dinámicas por nodo)
         elif data.get('event_type') == 'alert':
-            sensors_health['nginx'].update({
+            # Si el log trae 'database', va a la tabla de DB, si no a Nginx
+            target = 'db' if stype == 'database' else 'nginx'
+            sensors_health[target].update({
                 'status': "ONLINE",
                 'last_seen': datetime.now().strftime('%H:%M:%S'),
                 'ip': sensor_ip,
