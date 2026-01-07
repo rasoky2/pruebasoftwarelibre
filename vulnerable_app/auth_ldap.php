@@ -117,6 +117,47 @@ function verificar_estado_ldap() {
 // Verificar estado al cargar el módulo
 verificar_estado_ldap();
 
+/**
+ * Busca usuarios en el directorio LDAP
+ * VULNERABLE A LDAP INJECTION: No sanitiza la entrada $busqueda
+ */
+function buscar_usuarios_ldap($busqueda) {
+    global $LDAP_HOST, $LDAP_DOMAIN;
+
+    $ldap_host = $LDAP_HOST;
+    $ldap_port = 389;
+
+    // DN Base
+    $domain_parts = explode('.', $LDAP_DOMAIN);
+    $dc_parts = array_map(function($part) { return "dc=$part"; }, $domain_parts);
+    $ldap_dn_base = "ou=users," . implode(',', $dc_parts);
+
+    $connect = @ldap_connect($ldap_host, $ldap_port);
+    if (!$connect) return [];
+
+    ldap_set_option($connect, LDAP_OPT_PROTOCOL_VERSION, 3);
+    ldap_set_option($connect, LDAP_OPT_REFERRALS, 0);
+
+    // Bind Anónimo para búsqueda pública
+    if (@ldap_bind($connect)) {
+        // FILTRO VULNERABLE: Concatenación directa
+        // Intenta inyectar: *) (uid=admin
+        $filter = "(|(uid=*$busqueda*)(cn=*$busqueda*)(mail=*$busqueda*))";
+        
+        // Solo buscar personas
+        $final_filter = "(&(objectClass=person)$filter)";
+
+        $search = @ldap_search($connect, $ldap_dn_base, $final_filter);
+        if ($search) {
+            $entries = ldap_get_entries($connect, $search);
+            ldap_close($connect);
+            return $entries;
+        }
+    }
+    ldap_close($connect);
+    return [];
+}
+
 // Logica de procesamiento si se accede directamente (opcional)
 if (isset($_POST['ldap_login'])) {
     $user = $_POST['usuario'];

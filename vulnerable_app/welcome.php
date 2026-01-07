@@ -39,6 +39,14 @@ $auth_type = isset($_SESSION['auth_type']) ? $_SESSION['auth_type'] : 'Sesión A
             <a href="search.php" class="flex h-11 w-full items-center justify-center rounded-md bg-slate-900 text-white px-4 py-2 text-sm font-bold hover:bg-slate-800 transition-all">
                 Ir al Buscador de Productos
             </a>
+
+            <?php if (isset($_SESSION['role']) && $_SESSION['role'] === 'corporate'): ?>
+            <a href="directory.php" class="flex h-11 w-full items-center justify-center rounded-md bg-blue-600 text-white px-4 py-2 text-sm font-bold hover:bg-blue-700 transition-all">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                Directorio de Empleados (LDAP)
+            </a>
+            <?php endif; ?>
+
             <a href="logout.php" class="flex h-11 w-full items-center justify-center rounded-md border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 transition-all">
                 Cerrar Sesión Segura
             </a>
