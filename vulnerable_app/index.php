@@ -54,51 +54,112 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Inter', sans-serif; background-color: #020817; }
-        .shadcn-card { background-color: #020817; border: 1px solid #1e293b; color: #f8fafc; }
-        .shadcn-input { background-color: #0c1117; border: 1px solid #30363d; color: #f8fafc; }
-        .shadcn-input:focus { border-color: #3b82f6; outline: none; }
-        .btn-primary { background-color: #f8fafc; color: #020817; }
-        .btn-primary:hover { background-color: #e2e8f0; }
-        .btn-ldap { background-color: #2563eb; color: #ffffff; }
-        .btn-ldap:hover { background-color: #1d4ed8; }
-        .tab-btn { color: #94a3b8; border-bottom: 2px solid transparent; }
-        .tab-active { color: #f8fafc; border-bottom: 2px solid #f8fafc; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+        }
+        
+        .shadcn-card { 
+            background-color: #ffffff; 
+            border: 1px solid #e2e8f0; 
+            color: #1e293b;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        
+        .shadcn-input { 
+            background-color: #f8fafc; 
+            border: 1px solid #cbd5e1; 
+            color: #1e293b; 
+        }
+        
+        .shadcn-input:focus { 
+            border-color: #667eea; 
+            outline: none; 
+            background-color: #ffffff;
+        }
+        
+        .btn-primary { 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #ffffff; 
+        }
+        
+        .btn-primary:hover { 
+            background: linear-gradient(135deg, #5568d3 0%, #6a3f8f 100%);
+        }
+        
+        .btn-ldap { 
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: #ffffff; 
+        }
+        
+        .btn-ldap:hover { 
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+        }
+        
+        .tab-btn { 
+            color: #94a3b8; 
+            border-bottom: 2px solid transparent; 
+        }
+        
+        .tab-active { 
+            color: #667eea; 
+            border-bottom: 2px solid #667eea; 
+        }
+        
+        .container-center {
+            width: 100%;
+            max-width: 28rem;
+            margin: 0 auto;
+        }
     </style>
 </head>
-<body class="flex min-h-screen items-center justify-center p-4">
-    <div class="shadcn-card w-full max-w-md rounded-xl p-8 shadow-2xl">
+<body>
+    <div class="container-center">
+        <div class="shadcn-card rounded-xl p-8">
+
+
         <div class="mb-8 text-center">
-            <h1 class="text-3xl font-bold tracking-tight text-white mb-2">SIA Portal</h1>
-            <p class="text-sm text-slate-400">Sistema de Acceso a Infraestructura de Seguridad</p>
+            <h1 class="text-3xl font-bold tracking-tight text-gray-800 mb-2">SIA Portal</h1>
+            <p class="text-sm text-gray-600">Sistema de Acceso a Infraestructura de Seguridad</p>
         </div>
 
         <form method="POST" class="space-y-6" id="loginForm">
             <!-- Health Check Badges -->
             <div class="flex gap-2 justify-center mb-4">
                 <?php if ($db_connection_error): ?>
-                    <span class="inline-flex items-center rounded-full bg-red-400/10 px-2.5 py-0.5 text-xs font-medium text-red-400 border border-red-400/20" title="<?php echo $db_connection_error; ?>">
+                    <span class="inline-flex items-center rounded-full bg-red-50 px-2.5 py-0.5 text-xs font-medium text-red-700 border border-red-200" title="<?php echo $db_connection_error; ?>">
                         <span class="mr-1 h-1.5 w-1.5 rounded-full bg-red-500"></span> MySQL Offline
                     </span>
                 <?php else: ?>
-                    <span class="inline-flex items-center rounded-full bg-green-400/10 px-2.5 py-0.5 text-xs font-medium text-green-400 border border-green-400/20">
+                    <span class="inline-flex items-center rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-medium text-green-700 border border-green-200">
                         <span class="mr-1 h-1.5 w-1.5 rounded-full bg-green-500"></span> MySQL Online
                     </span>
                 <?php endif; ?>
 
                 <?php if (!$ldap_server_online): ?>
-                    <span class="inline-flex items-center rounded-full bg-red-400/10 px-2.5 py-0.5 text-xs font-medium text-red-400 border border-red-400/20" title="<?php echo $ldap_connection_error; ?>">
+                    <span class="inline-flex items-center rounded-full bg-red-50 px-2.5 py-0.5 text-xs font-medium text-red-700 border border-red-200" title="<?php echo $ldap_connection_error; ?>">
                         <span class="mr-1 h-1.5 w-1.5 rounded-full bg-red-500"></span> LDAP Offline
                     </span>
                 <?php else: ?>
-                    <span class="inline-flex items-center rounded-full bg-blue-400/10 px-2.5 py-0.5 text-xs font-medium text-blue-400 border border-blue-400/20">
+                    <span class="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700 border border-blue-200">
                         <span class="mr-1 h-1.5 w-1.5 rounded-full bg-blue-500"></span> LDAP Online
                     </span>
                 <?php endif; ?>
             </div>
 
             <!-- Selección de Método de Autenticación -->
-            <div class="flex justify-around border-b border-slate-800 pb-2 mb-6">
+            <div class="flex justify-around border-b border-gray-200 pb-2 mb-6">
                 <button type="button" id="tabDB" onclick="setMethod('DB')" class="tab-btn pb-2 text-sm font-semibold tab-active">Tradicional</button>
                 <button type="button" id="tabLDAP" onclick="setMethod('LDAP')" class="tab-btn pb-2 text-sm font-semibold">Corporativo (LDAP)</button>
             </div>
@@ -106,19 +167,19 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             <input type="hidden" name="auth_method" id="auth_method" value="DB">
 
             <div class="space-y-2">
-                <label class="text-xs font-semibold uppercase tracking-wider text-slate-500" for="username">Usuario</label>
+                <label class="text-xs font-semibold uppercase tracking-wider text-gray-600" for="username">Usuario</label>
                 <input type="text" name="username" id="username" placeholder="Tu usuario" required
                        class="shadcn-input flex h-10 w-full rounded-md px-3 py-2 text-sm transition-all">
             </div>
             
             <div class="space-y-2">
-                <label class="text-xs font-semibold uppercase tracking-wider text-slate-500" for="password">Contraseña</label>
+                <label class="text-xs font-semibold uppercase tracking-wider text-gray-600" for="password">Contraseña</label>
                 <input type="password" name="password" id="password" placeholder="••••••••" required
                        class="shadcn-input flex h-10 w-full rounded-md px-3 py-2 text-sm transition-all">
             </div>
 
             <?php if ($error): ?>
-                <div class="rounded-lg border border-red-500/50 bg-red-500/10 p-3 text-sm text-red-400 text-center animate-pulse">
+                <div class="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700 text-center">
                     <i class="lucide-alert-circle mr-2"></i> <?php echo $error; ?>
                 </div>
             <?php endif; ?>
@@ -128,15 +189,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             </button>
         </form>
 
-        <div class="mt-8 pt-6 border-t border-slate-800 flex flex-col gap-4">
-            <button onclick="injectSQL()" class="text-xs font-medium text-slate-500 hover:text-white transition-colors flex items-center justify-center gap-2">
-                <span class="p-1 rounded bg-slate-800">🚀</span> Bypass SQL Injection (Solo Tradicional)
+        <div class="mt-8 pt-6 border-t border-gray-200 flex flex-col gap-4">
+            <button onclick="injectSQL()" class="text-xs font-medium text-gray-600 hover:text-gray-900 transition-colors flex items-center justify-center gap-2">
+                <span class="p-1 rounded bg-gray-100">🚀</span> Bypass SQL Injection (Solo Tradicional)
             </button>
-            <div class="text-[10px] text-slate-600 text-center">
+            <div class="text-[10px] text-gray-500 text-center">
                 Infraestructura vinculada: MySQL Remoto (1.57) | LDAP Agustín (1.161)
             </div>
         </div>
     </div>
+</div>
+
 
     <script>
         function setMethod(method) {
