@@ -213,8 +213,45 @@ def setup_db_config():
         "DB_IP": db_host,
         "DB_NAME": db_name,
         "DB_USER": db_user,
-        "DB_PASS": db_pass
+        "DB_PASS": db_pass,
+        "SENSOR_TYPE": "database"
     })
+    print("[OK] Configuración de Base de Datos y SENSOR_TYPE actualizados.")
+    
+    # 7. Configuración de Seguridad (Suricata en DB)
+    print("\n" + "="*50)
+    print("   MONITOREO DE SEGURIDAD (Suricata IDS)")
+    print("="*50)
+    if input("¿Desea instalar y configurar Suricata IDS en el servidor de DB? (s/N): ").lower() == 's':
+        # Importar funciones de instalación/configuración de Suricata si están disponibles o definirlas
+        print("[*] Instalando Suricata en Servidor Database...")
+        subprocess.run(["sudo", "apt", "update"], check=False)
+        subprocess.run(["sudo", "apt", "install", "-y", "suricata", "python3-psutil"], check=False)
+        
+        # Configurar Suricata (usamos una versión simplificada de la lógica de nginx)
+        local_ip = get_local_ip()
+        suricata_yaml = "/etc/suricata/suricata.yaml"
+        # Intentar copiar nuestras reglas personalizadas
+        rules_src = os.path.join(os.path.dirname(os.path.dirname(__file__)), "suricata", "rules", "local.rules")
+        rules_dst = "/etc/suricata/rules/local.rules"
+        
+        if os.path.exists(rules_src):
+            subprocess.run(["sudo", "mkdir", "-p", "/etc/suricata/rules"], check=False)
+            subprocess.run(["sudo", "cp", rules_src, rules_dst], check=True)
+            print("[OK] Reglas de seguridad copiadas.")
+
+        # Configurar el Log Shipper para la DB
+        print("[*] Instalando Log Shipper para Database...")
+        shipper_src = os.path.join(os.path.dirname(os.path.dirname(__file__)), "suricata", "log_shipper.py")
+        service_src = os.path.join(os.path.dirname(os.path.dirname(__file__)), "suricata", "log-shipper.service")
+        service_dst = "/etc/systemd/system/log-shipper.service"
+
+        if os.path.exists(service_src):
+            subprocess.run(["sudo", "cp", service_src, service_dst], check=True)
+            subprocess.run(["sudo", "systemctl", "daemon-reload"], check=True)
+            subprocess.run(["sudo", "systemctl", "enable", "log-shipper"], check=True)
+            subprocess.run(["sudo", "systemctl", "restart", "log-shipper"], check=True)
+            print("[OK] Log Shipper de Seguridad activo en DB.")
     
     # 7. Instalación del Servicio Heartbeat (Python)
     if input("\n¿Desea instalar/actualizar el servicio de latido (Heartbeat) para el Dashboard? (s/N): ").lower() == 's':
