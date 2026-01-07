@@ -532,9 +532,12 @@
           }
 
           // Lógica para diferenciar auditoría DB vs Ataques reales
+          // Lógica para diferenciar auditoría DB vs Ataques reales
           let rowClass =
             "border-b bg-red-50/20 hover:bg-red-50 transition-colors";
           let alertTextClass = "text-red-700";
+          let finalBadgeText = badgeText;
+          let finalBadgeColor = badgeColor;
 
           // Si es un acceso a DB, verificamos si viene de Nginx (tráfico legítimo)
           if (badgeText === "DB ACCESS") {
@@ -543,15 +546,22 @@
               ?.innerText?.split("|")[0]
               ?.trim()
               ?.replace("IP: ", "");
+
             if (src_ip === nginxIP) {
-              // Es Nginx accediendo a la DB => Tráfico normal
+              // Es Nginx accediendo a la DB => Tráfico normal (AZUL)
               rowClass =
-                "border-b bg-emerald-50/20 hover:bg-emerald-50 transition-colors";
-              alertTextClass = "text-emerald-700";
+                "border-b bg-blue-50/20 hover:bg-blue-50 transition-colors";
+              alertTextClass = "text-blue-700";
+              finalBadgeText = "AUTHORIZED";
+              finalBadgeColor = "bg-blue-100 text-blue-700";
+            } else {
+              // Es otra IP accediendo a la DB => Posible intrusión (ROJO)
+              finalBadgeText = "UNAUTHORIZED ACCESS";
+              // badgeColor ya viene rojo por defecto, lo mantenemos
             }
           }
 
-          const badge = `<span class="px-1.5 py-0.5 ${badgeColor} rounded text-[9px] font-bold uppercase">${badgeText}</span>`;
+          const badge = `<span class="px-1.5 py-0.5 ${finalBadgeColor} rounded text-[9px] font-bold uppercase">${finalBadgeText}</span>`;
 
           const row = document.createElement("tr");
           row.className = rowClass;

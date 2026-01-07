@@ -167,8 +167,18 @@ def receive_suricata_log():
             logs_storage.append(data)
             if data.get('event_type') == 'alert':
                 alert = data.get('alert', {})
-                print(f"\n{Colors.FAIL}[!] ALERTA DESDE {sensor_ip} [!]{Colors.ENDC}")
-                print(f"Ataque: {alert.get('signature')} | Atacante: {data.get('src_ip')}")
+                signature = alert.get('signature', '')
+                src_ip = data.get('src_ip')
+                
+                # Verificar si es tráfico legítimo (Nginx -> DB)
+                is_db_access = "DATABASE" in signature.upper() or "MYSQL" in signature.upper()
+                nginx_ip = current_config['nginx_ip'].strip()
+                
+                if is_db_access and src_ip == nginx_ip:
+                     print(f"{Colors.OKBLUE}[INFO] Acceso Legítimo a DB desde Nginx ({src_ip}){Colors.ENDC}")
+                else:
+                    print(f"\n{Colors.FAIL}[!] ALERTA DESDE {sensor_ip} [!]{Colors.ENDC}")
+                    print(f"Ataque: {signature} | Atacante: {src_ip}")
             elif data.get('event_type') == 'stats':
                 print(f"{Colors.OKGREEN}[H] Heartbeat de Suricata ({sensor_ip}) recibido.{Colors.ENDC}")
         else:
