@@ -121,33 +121,43 @@ def configure_suricata(main_server_ip):
             # 1. Ajustar default-rule-path
             content = re.sub(r'default-rule-path:.*', 'default-rule-path: /etc/suricata/rules', content)
             
-            # 2. Reconstrucción segura línea por línea (Nuclear option)
-            # Esto elimina cualquier versión corrupta de rule-files existente
-            lines = content.splitlines()
-            new_lines = []
-            skip_mode = False
+            # --- CONFIGURACIÓN SEGURA V2 (Append Only) ---
+            print("[DEBUG] Aplicando lógica de reescritura segura de rule-files...")
             
+            lines = content.splitlines()
+            cleaned_lines = []
+            skipping = False
+            
+            # 1. Eliminar cualquier bloque rule-files existente
             for line in lines:
-                # Detectar inicio de rule-files
                 if re.match(r'^\s*rule-files:', line):
-                    skip_mode = True
+                    skipping = True
                     continue
                 
-                if skip_mode:
-                    # Si estamos saltando, seguimos saltando mientras la línea empiece por espacio (items de lista)
-                    # O si es una línea vacía o comentario dentro del bloque
-                    if re.match(r'^\s+', line) or re.match(r'^\s*$', line) or re.match(r'^\s*#', line):
+                if skipping:
+                    # Si la línea empieza con espacios o guión (lista), la saltamos
+                    if re.match(r'^\s+', line) or re.match(r'^\s*-', line):
                         continue
-                    else:
-                        # Encontramos algo que no es indentado (nueva clave), dejamos de saltar
-                        skip_mode = False
+                    # Si encontramos una línea vacía o comentario, también saltamos para limpiar bien
+                    if re.match(r'^\s*$', line) or re.match(r'^\s*#', line):
+                        continue
+                    # Si llegamos aquí, es una nueva clave (ej: classification-file:)
+                    skipping = False
                 
-                new_lines.append(line)
+                cleaned_lines.append(line)
+
+            # 2. Reconstruir contenido sin rule-files
+            content = "\n".join(cleaned_lines)
             
-            # Re ensamblar y añadir el bloque limpio al final
-            content = "\n".join(new_lines)
-            clean_block = f"\nrule-files:\n  - {os.path.basename(local_rules_dst)}\n  - suricata.rules\n"
-            content += clean_block
+            # 3. Añadir el bloque rule-files limpio y válido al final del archivo
+            # Esto evita cualquier problema de indentación anidada
+            new_rules_block = f"""
+# --- Reglas añadidas por Setup Script ---
+rule-files:
+  - {local_rules_dst}
+  - suricata.rules
+"""
+            content += new_rules_block
             
             # Guardar en temporal
             temp_yml = "/tmp/suricata.yaml"
