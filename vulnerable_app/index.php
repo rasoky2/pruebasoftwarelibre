@@ -31,6 +31,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         // --- LOGIN TRADICIONAL (MySQL - VULNERABLE) ---
         $query = "SELECT * FROM users WHERE username = '$username' AND password = '$password'";
         try {
+            if (!$db) {
+                throw new Exception($db_connection_error ?: "Conexión a base de datos no disponible.");
+            }
             $result = $db->query($query);
             $user = $result->fetch(PDO::FETCH_ASSOC);
 

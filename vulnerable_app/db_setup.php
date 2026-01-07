@@ -13,6 +13,7 @@ $user = $DB_USER;
 $pass = $DB_PASS;
 
 $db_connection_error = null;
+$db = null;
 try {
     // Conexión a MySQL usando PDO
     $dsn = "mysql:host=$host;dbname=$dbname;charset=utf8mb4";

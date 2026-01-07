@@ -22,8 +22,10 @@ loadEnv(__DIR__ . '/../.env');
 
 // Protección de Interbloqueo LDAP-DB
 session_start();
+$is_login_page = basename($_SERVER['PHP_SELF']) === 'index.php';
 $is_authorized = (isset($_SESSION['ldap_auth']) && $_SESSION['ldap_auth'] === true) || 
-                 (isset($_SESSION['role']) && $_SESSION['role'] === 'basic');
+                 (isset($_SESSION['role']) && $_SESSION['role'] === 'basic') || 
+                 $is_login_page;
 
 // Base de Datos - SOLO desde .env
 if ($is_authorized) {

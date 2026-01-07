@@ -17,6 +17,17 @@ def get_local_ip():
     except Exception:
         return "127.0.0.1"
 
+def test_socket(ip, port, timeout=2):
+    """Prueba conectividad a nivel de red (TCP)"""
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(timeout)
+        s.connect((ip, port))
+        s.close()
+        return True
+    except Exception:
+        return False
+
 def check_package_installed(package_name):
     try:
         result = subprocess.run(["dpkg", "-l", package_name], capture_output=True, text=True)
@@ -247,6 +258,22 @@ def setup_nginx():
                     for line in f:
                         if "DB_IP=" in line:
                             suggested_db_ip = line.split('=')[1].strip()
+
+        # 5. Verificación de conectividad con el Dashboard (Admin)
+        print(f"\n[*] Verificando conectividad con el Dashboard en {main_server_ip}:5000...")
+        if test_socket(main_server_ip, 5000):
+            print(f"[OK] Conexión con Dashboard EXITOSA (Admin está recibiendo logs).")
+        else:
+            print(f"[!] ADVERTENCIA: No se pudo conectar con el Dashboard en {main_server_ip}:5000.")
+            print(f"    Verifica que el script main.py esté corriendo en el Servidor Admin.")
+
+        # 6. Forzar reinicio de servicios para aplicar cambios del .env
+        print("\n[*] Reiniciando servicios para aplicar configuración final...")
+        subprocess.run(["sudo", "systemctl", "daemon-reload"], check=False)
+        subprocess.run(["sudo", "systemctl", "restart", "php-backend"], check=False)
+        if check_package_installed("suricata"):
+            subprocess.run(["sudo", "systemctl", "restart", "log-shipper"], check=False)
+        print("[OK] Servicios actualizados.")
 
             db_host = input(f"IP del Servidor MySQL [{suggested_db_ip}]: ") or suggested_db_ip
             db_name = input("Nombre de la DB [lab_vulnerable]: ") or "lab_vulnerable"
