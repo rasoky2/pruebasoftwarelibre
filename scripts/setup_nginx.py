@@ -133,118 +133,34 @@ def configure_suricata(main_server_ip):
             # Generar bloque de reglas dinámico
             rules_yaml_list = "\n".join([f"  - {r}" for r in included_rules])
 
-            # Contenido YAML minimalista y garantizado de funcionar
-            minimal_yaml = f"""%YAML 1.1
----
-# Configuracion Auto-Generada por Setup Script
-vars:
-  address-groups:
-    HOME_NET: "[{local_ip}/32]"
-    EXTERNAL_NET: "!$HOME_NET"
-    HTTP_SERVERS: "$HOME_NET"
-    SMTP_SERVERS: "$HOME_NET"
-    SQL_SERVERS: "$HOME_NET"
-    DNS_SERVERS: "$HOME_NET"
-    TELNET_SERVERS: "$HOME_NET"
-    AIM_SERVERS: "any"
-    DC_SERVERS: "$HOME_NET"
-    DNP3_SERVER: "$HOME_NET"
-    DNP3_CLIENT: "$HOME_NET"
-    MODBUS_CLIENT: "$HOME_NET"
-    MODBUS_SERVER: "$HOME_NET"
-    ENIP_CLIENT: "$HOME_NET"
-    ENIP_SERVER: "$HOME_NET"
-
-  port-groups:
-    HTTP_PORTS: "80"
-    SHELLCODE_PORTS: "!80"
-    ORACLE_PORTS: 1521
-    SSH_PORTS: 22
-    DNP3_PORTS: 20000
-    MODBUS_PORTS: 502
-    FILE_DATA_PORTS: "[$HTTP_PORTS,110,143]"
-    FTP_PORTS: 21
-    GENEVE_PORTS: 6081
-    VXLAN_PORTS: 4789
-    TEREDO_PORTS: 3544
-
-default-rule-path: /etc/suricata/rules
-
-rule-files:
-{rules_yaml_list}
-
-{class_line}
-{ref_line}
-
-outputs:
-  - fast:
-      enabled: yes
-      filename: fast.log
-      append: yes
-  - eve-log:
-      enabled: yes
-      filetype: regular
-      filename: eve.json
-      types:
-        - alert
-        - http:
-            extended: yes
-        - dns
-        - tls:
-            extended: yes
-        - files:
-            force-magic: yes
-        - smtp
-        - ssh
-      
-af-packet:
-  - interface: default
-    threads: auto
-    cluster-id: 99
-    cluster-type: cluster_flow
-    defrag: yes
-
-app-layer:
-  protocols:
-    krb5:
-      enabled: yes
-    ikev2:
-      enabled: yes
-    tls:
-      enabled: yes
-      detection-ports:
-        dp: 443
-    dcerpc:
-      enabled: yes
-    ftp:
-      enabled: yes
-    ssh:
-      enabled: yes
-    smtp:
-      enabled: yes
-    imap:
-      enabled: yes
-    modbus:
-      enabled: yes
-    dnp3:
-      enabled: yes
-    enip:
-      enabled: yes
-    nfs:
-      enabled: yes
-    dns:
-      tcp:
-        enabled: yes
-        detection-ports:
-          dp: 53
-      udp:
-        enabled: yes
-        detection-ports:
-          dp: 53
-
-"""
-            content = minimal_yaml
+            # --- CONFIGURACIÓN ESTRATEGIA MYSQL (Cirugía Mínima) ---
+            print("[DEBUG] Aplicando estrategia robusta tipo MySQL...")
             
+            # 0. Si existe un backup ORIGINAL del sistema (creado en V4), lo restauramos para partir de cero
+            # Esto es vital porque V4 rompió las variables de entorno del sistema (vars)
+            backup_sys = f"{suricata_yaml}.bak_setup"
+            if os.path.exists(backup_sys):
+                print("[*] Restaurando configuración original del sistema...")
+                subprocess.run(["sudo", "cp", backup_sys, suricata_yaml], check=True)
+
+            with open(suricata_yaml, "r") as f: content = f.read()
+            
+            # 1. Configurar HOME_NET
+            content = re.sub(r'HOME_NET: "\[.*?\]"', f'HOME_NET: "[{local_ip}/32]"', content)
+            
+            # 2. Ajustar default-rule-path
+            content = re.sub(r'default-rule-path:.*', 'default-rule-path: /etc/suricata/rules', content)
+            
+            # 3. Inyección quirúrgica de local.rules (Igual que en MySQL)
+            # Solo si no está ya incluido
+            if "local.rules" not in content:
+                # Buscamos la etiqueta rule-files: e insertamos justo debajo
+                if "rule-files:" in content:
+                     content = content.replace("rule-files:", f"rule-files:\n  - {os.path.basename(local_rules_dst)}")
+                else:
+                    # Si no existe la etiqueta (raro), la añadimos al final
+                    content += f"\nrule-files:\n  - {os.path.basename(local_rules_dst)}\n"
+
             # Guardar en temporal
             temp_yml = "/tmp/suricata.yaml"
             with open(temp_yml, "w") as f: f.write(content)
