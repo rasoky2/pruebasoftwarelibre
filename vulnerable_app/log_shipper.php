@@ -1,68 +1,35 @@
 <?php
 /**
- * Log Shipper - Envia logs de Suricata al Servidor Main
- * 
- * Este script debe ejecutarse en segundo plano en el Nodo de Borde.
- * Lee el archivo eve.json y envía cada alerta vía HTTP POST.
+ * log_shipper.php - Envía eventos de la aplicación al Dashboard Central
  */
 
-/**
- * Carga variables desde un archivo .env simple
- */
-require_once __DIR__ . '/config.php';
+function ship_log($event_type, $message, $extra_data = []) {
+    require_once __DIR__ . '/config.php';
+    global $MAIN_SERVER_IP, $MAIN_SERVER_PORT;
 
-$suricataLogPath = __DIR__ . '/' . $SURICATA_LOG_PATH;
-$mainServerIp = $MAIN_SERVER_IP;
-$mainServerPort = $MAIN_SERVER_PORT;
-$mainServerUrl = "http://$mainServerIp:$mainServerPort";
-
-echo "Iniciando Shipper de Logs apuntando a $mainServerUrl...\n";
-
-// Abrir el archivo de logs
-$handle = fopen($suricataLogPath, 'r');
-if (!$handle) {
-    die("Error: No se pudo abrir el archivo de logs en $suricataLogPath\n");
-}
-
-// Mover el puntero al final para solo enviar logs nuevos
-fseek($handle, 0, SEEK_END);
-
-while (true) {
-    $line = fgets($handle);
+    $url = "http://$MAIN_SERVER_IP:$MAIN_SERVER_PORT/";
     
-    if ($line === false) {
-        // No hay líneas nuevas, esperar un momento
-        usleep(500000); // 0.5 segundos
-        clearstatcache();
-        continue;
-    }
+    $log_data = [
+        "timestamp" => date('c'),
+        "event_type" => "app_event",
+        "app_module" => $event_type,
+        "message" => $message,
+        "src_ip" => $_SERVER['REMOTE_ADDR'] ?? 'unknown',
+        "user_agent" => $_SERVER['HTTP_USER_AGENT'] ?? 'unknown',
+        "uri" => $_SERVER['REQUEST_URI'] ?? 'unknown'
+    ];
 
-    $logData = json_decode($line, true);
-    
-    // Enviar alertas y estadísticas de recursos (stats)
-    if (isset($logData['event_type'])) {
-        if ($logData['event_type'] === 'alert' || $logData['event_type'] === 'stats') {
-            enviarLog($logData, $mainServerUrl);
-        }
-    }
-}
+    $payload = array_merge($log_data, $extra_data);
 
-function enviarLog($data, $url) {
-    echo "Enviando alerta detectada: " . ($data['alert']['signature'] ?? 'Unknown') . "\n";
-    
-    $payload = json_encode($data);
     $ch = curl_init($url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_POST, true);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type:application/json'));
+    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+    curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 1); // No bloquear la web si el dashboard está lento
     
     $result = curl_exec($ch);
-    $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
-    
-    if ($status !== 200) {
-        echo "Error al enviar log al Main (Status: $status)\n";
-    }
+    return $result;
 }
 ?>

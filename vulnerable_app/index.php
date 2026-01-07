@@ -22,10 +22,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $_SESSION['auth_type'] = 'LDAP (Corporativo)';
             $_SESSION['role'] = 'corporate'; // Asignar rol corporativo
             $_SESSION['ldap_auth'] = true; // Marcar que la autenticación fue por LDAP
+            
+            ship_log("login_success", "Usuario $username logueado via LDAP", ["user" => $username, "auth" => "LDAP"]);
+            
             header('Location: welcome.php');
             exit;
         } else {
             $error = "Error: Autenticación LDAP fallida. (Hable con Agustín)";
+            ship_log("login_fail", "Fallo de login LDAP para usuario: $username", ["user" => $username, "auth" => "LDAP"]);
         }
     } else {
         // --- LOGIN TRADICIONAL (MySQL - VULNERABLE) ---
@@ -41,13 +45,18 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $_SESSION['user'] = $user['username'];
                 $_SESSION['auth_type'] = 'Base de Datos (Tradicional)';
                 $_SESSION['role'] = 'basic'; // Asignar rol básico
+                
+                ship_log("login_success", "Usuario $username logueado via DB (Vulnerable)", ["user" => $username, "auth" => "DB"]);
+                
                 header('Location: welcome.php');
                 exit;
             } else {
                 $error = "Usuario o contraseña incorrectos.";
+                ship_log("login_fail", "Fallo de login DB para usuario: $username", ["user" => $username, "auth" => "DB", "query" => $query]);
             }
         } catch (Exception $e) {
             $error = "Error en la consulta: " . $e->getMessage();
+            ship_log("db_error", "Error SQL: " . $e->getMessage(), ["query" => $query]);
         }
     }
 }
