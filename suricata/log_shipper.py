@@ -19,36 +19,39 @@ def get_local_ip():
         s.close()
     return ip
 
-
 def get_system_stats():
-    """Obtiene métricas de CPU y Memoria"""
+    """Obtiene métricas de CPU y Memoria (arreglado para no dar 0)"""
     try:
         # psutil necesita un intervalo para calcular el cambio de CPU
-        cpu = psutil.cpu_percent(interval=0.5)
+        cpu = psutil.cpu_percent(interval=1.0)
         ram = psutil.virtual_memory().percent
         return {"cpu": cpu, "ram": ram}
     except:
         return {"cpu": 0, "ram": 0}
 
 def send_heartbeat_loop(url, local_ip, sensor_type):
-    """Manda un latido cada 10s con métricas de sistema"""
+    """Bucle infinito de envío de latidos con métricas reales"""
+    print(f"[*] Hilo de Heartbeat iniciado para {sensor_type}...")
     while True:
         try:
             stats = get_system_stats()
             payload = {
-                "status": "ONLINE",
                 "sensor_type": sensor_type,
+                "status": "ONLINE",
                 "timestamp": time.time(),
                 "metrics": stats,
                 "ip": local_ip
             }
-            requests.post(url, json=payload, timeout=5)
-        except:
+            # Enviamos el latido con las métricas
+            response = requests.post(url, json=payload, timeout=5)
+            # print(f"[DEBUG] Heartbeat enviado: {stats}") # Opcional para debug
+        except Exception as e:
+            # print(f"[!] Error en Heartbeat: {e}")
             pass
         time.sleep(10)
 
 def ship_suricata_logs():
-    # Cargar configuración...
+    # Cargar configuración desde .env
     env_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".env"))
     load_dotenv(env_path)
     
@@ -58,16 +61,23 @@ def ship_suricata_logs():
     log_file = "/var/log/suricata/eve.json"
     local_ip = get_local_ip()
     
-    print(f"[*] Iniciando Shipper (Python) [{sensor_type.upper()}] con Métricas de Sistema...")
-    print(f"[*] Reportando a: {dashboard_url}")
+    print(f"\n" + "="*50)
+    print(f"   LOG SHIPPER DINÁMICO [{sensor_type.upper()}]")
+    print(f"   Reportando a: {dashboard_url}")
+    print(f"   IP Local: {local_ip}")
+    print("="*50 + "\n")
     
-    # Iniciar hilo de latido/métricas
-    threading.Thread(target=send_heartbeat_loop, args=(dashboard_url, local_ip, sensor_type), daemon=True).start()
+    # INICIAR HILO DE MÉTRICAS (Heartbeat)
+    # Esto asegura que las métricas de CPU/RAM se envíen cada 10s independientemente de los logs
+    heartbeat_thread = threading.Thread(target=send_heartbeat_loop, args=(dashboard_url, local_ip, sensor_type), daemon=True)
+    heartbeat_thread.start()
     
-    # Continuar con el tail de logs...
+    # TAIL DE LOGS DE SURICATA (Alertas)
     if not os.path.exists(log_file):
-        print(f"[!] Archivo de log {log_file} no encontrado. Esperando...")
-        try: open(log_file, 'a').close()
+        print(f"[!] Archivo de log {log_file} no encontrado. Creando...")
+        try: 
+            os.makedirs(os.path.dirname(log_file), exist_ok=True)
+            open(log_file, 'a').close()
         except: pass
 
     # Usar tail -F para manejar rotación de logs de forma robusta
@@ -82,9 +92,12 @@ def ship_suricata_logs():
         try:
             log_data = json.loads(line)
             if log_data.get('event_type') == 'alert':
-                # Enriquecer log con tipo de sensor e IP de origen
+                # Enriquecer log con identidad del sensor y sus métricas actuales
                 log_data['sensor_type'] = sensor_type
                 log_data['sensor_source'] = local_ip
+                # Opcional: Incluir métricas en la alerta para actualización inmediata
+                log_data['metrics'] = get_system_stats()
+                
                 requests.post(dashboard_url, json=log_data, timeout=5)
                 print(f"[ALERT] {log_data['alert']['signature']} de {log_data.get('src_ip')}")
         except:

@@ -519,6 +519,13 @@
           } else if (signature.includes("SSH")) {
             badgeColor = "bg-purple-100 text-purple-700";
             badgeText = "SSH";
+          } else if (
+            signature.includes("DATABASE") ||
+            signature.includes("DB") ||
+            signature.includes("MYSQL")
+          ) {
+            badgeColor = "bg-emerald-100 text-emerald-700";
+            badgeText = "DB ACCESS";
           } else if (signature.includes("Scan")) {
             badgeColor = "bg-orange-100 text-orange-700";
             badgeText = "SCAN";

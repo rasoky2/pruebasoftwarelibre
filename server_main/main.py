@@ -133,54 +133,33 @@ def receive_suricata_log():
         # DEBUG: Ver qué IP llega
         # print(f"DEBUG: Heartbeat/Log desde {sensor_ip}")
 
-        # Identificar y Actualizar Salud del Sensor
-        stype = data.get('sensor_type')
-        metrics = data.get('metrics', {"cpu": 0, "ram": 0})
+        # Identificar el objetivo (db o nginx)
+        target = 'db' if stype == 'database' else 'nginx'
 
-        # Caso 1: Reporte explícito de tipo
-        if stype == 'database':
-            sensors_health['db'].update({
-                'status': "ONLINE",
-                'last_seen': datetime.now().strftime('%H:%M:%S'),
-                'ip': sensor_ip,
-                'metrics': metrics
-            })
-        elif stype == 'nginx':
-            sensors_health['nginx'].update({
-                'status': "ONLINE",
-                'last_seen': datetime.now().strftime('%H:%M:%S'),
-                'ip': sensor_ip,
-                'metrics': metrics
-            })
-        # Caso 2: Alertas de Suricata (ahora dinámicas por nodo)
-        elif data.get('event_type') == 'alert':
-            # Si el log trae 'database', va a la tabla de DB, si no a Nginx
-            target = 'db' if stype == 'database' else 'nginx'
-            sensors_health[target].update({
-                'status': "ONLINE",
-                'last_seen': datetime.now().strftime('%H:%M:%S'),
-                'ip': sensor_ip,
-                'metrics': metrics
-            })
-        # Caso 3: Fallback por IP configurada
-        else:
+        # Actualizar información base
+        sensors_health[target].update({
+            'status': "ONLINE",
+            'last_seen': datetime.now().strftime('%H:%M:%S'),
+            'ip': sensor_ip
+        })
+
+        # Solo actualizar métricas si el paquete las trae (evita resetear a 0 en alertas)
+        if 'metrics' in data:
+            sensors_health[target]['metrics'] = data['metrics']
+        
+        # Si es una alerta, no hace falta buscar por IP, ya sabemos el target
+        if data.get('event_type') == 'alert':
+            pass # Ya actualizado arriba
+        
+        # Caso 3: Fallback por IP (Si no hay sensor_type y no es alerta)
+        elif not stype:
             target_db = current_config['db_ip'].strip()
             target_nginx = current_config['nginx_ip'].strip()
 
             if sensor_ip == target_db:
-                sensors_health['db'].update({
-                    'status': "ONLINE",
-                    'last_seen': datetime.now().strftime('%H:%M:%S'),
-                    'ip': sensor_ip,
-                    'metrics': metrics
-                })
+                sensors_health['db']['ip'] = sensor_ip
             elif sensor_ip == target_nginx:
-                sensors_health['nginx'].update({
-                    'status': "ONLINE",
-                    'last_seen': datetime.now().strftime('%H:%M:%S'),
-                    'ip': sensor_ip,
-                    'metrics': metrics
-                })
+                sensors_health['nginx']['ip'] = sensor_ip
 
         # Guardar el log si tiene tipo de evento
         if data.get('event_type'):
