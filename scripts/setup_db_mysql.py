@@ -14,6 +14,17 @@ def get_local_ip():
     except Exception:
         return "127.0.0.1"
 
+def test_socket(ip, port, timeout=2):
+    """Prueba conectividad a nivel de red (TCP)"""
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(timeout)
+        s.connect((ip, port))
+        s.close()
+        return True
+    except Exception:
+        return False
+
 def check_package_installed(package_name):
     try:
         result = subprocess.run(["dpkg", "-l", package_name], capture_output=True, text=True)
