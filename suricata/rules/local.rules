@@ -1,27 +1,130 @@
-# Reglas básicas para detectar ataques comunes en el laboratorio
+# ============================================================
+# REGLAS DE DETECCIÓN DE ATAQUES - LABORATORIO DE SEGURIDAD
+# Actualizado: 2026-01-07
+# ============================================================
 
+# --- DETECCIÓN DE SQLMAP (HERRAMIENTA DE ATAQUE) ---
+# Detectar SQLMap por User-Agent característico
+alert http $EXTERNAL_NET any -> $HTTP_SERVERS any (msg:"ATTACK: SQLMap Tool Detected by User-Agent"; flow:established,to_server; content:"sqlmap"; http_user_agent; nocase; classtype:web-application-attack; sid:1000011; rev:1;)
+
+# Detectar Havij (otra herramienta de SQL Injection)
+alert http $EXTERNAL_NET any -> $HTTP_SERVERS any (msg:"ATTACK: Havij SQL Injection Tool Detected"; flow:established,to_server; content:"Havij"; http_user_agent; nocase; classtype:web-application-attack; sid:1000012; rev:1;)
+
+# --- SQL INJECTION BÁSICA ---
 # Detectar SQL Injection básica (OR 1=1)
-alert http $EXTERNAL_NET any -> $HTTP_SERVERS any (msg:"POSSIBLE SQL Injection (OR 1=1)"; flow:established,to_server; content:"' OR '1'='1"; http_client_body; classtype:web-application-attack; sid:1000001; rev:1;)
-alert http $EXTERNAL_NET any -> $HTTP_SERVERS any (msg:"POSSIBLE SQL Injection (OR 1=1)"; flow:established,to_server; content:"' OR '1'='1"; http_uri; classtype:web-application-attack; sid:1000002; rev:1;)
+alert http $EXTERNAL_NET any -> $HTTP_SERVERS any (msg:"ATTACK: SQL Injection (OR 1=1) in Body"; flow:established,to_server; content:"' OR '1'='1"; http_client_body; classtype:web-application-attack; sid:1000001; rev:2;)
+alert http $EXTERNAL_NET any -> $HTTP_SERVERS any (msg:"ATTACK: SQL Injection (OR 1=1) in URI"; flow:established,to_server; content:"' OR '1'='1"; http_uri; classtype:web-application-attack; sid:1000002; rev:2;)
 
-# Detectar XSS (Script tags)
-alert http $EXTERNAL_NET any -> $HTTP_SERVERS any (msg:"POSSIBLE XSS Attack (script tag)"; flow:established,to_server; content:"<script>"; nocase; http_uri; classtype:web-application-attack; sid:1000003; rev:1;)
-alert http $EXTERNAL_NET any -> $HTTP_SERVERS any (msg:"POSSIBLE XSS Attack (script tag)"; flow:established,to_server; content:"<script>"; nocase; http_client_body; classtype:web-application-attack; sid:1000004; rev:1;)
+# Detectar OR 1=1 sin comillas
+alert http $EXTERNAL_NET any -> $HTTP_SERVERS any (msg:"ATTACK: SQL Injection (OR 1=1 variant)"; flow:established,to_server; content:"OR"; nocase; content:"1=1"; nocase; distance:0; within:10; http_client_body; classtype:web-application-attack; sid:1000013; rev:1;)
 
-# Detectar SQL Injection (UNION SELECT)
-alert http $EXTERNAL_NET any -> $HTTP_SERVERS any (msg:"POSSIBLE SQL Injection (UNION SELECT)"; flow:established,to_server; content:"UNION SELECT"; nocase; http_uri; classtype:web-application-attack; sid:1000005; rev:1;)
-alert http $EXTERNAL_NET any -> $HTTP_SERVERS any (msg:"POSSIBLE SQL Injection (UNION SELECT)"; flow:established,to_server; content:"UNION SELECT"; nocase; http_client_body; classtype:web-application-attack; sid:1000006; rev:1;)
+# Detectar AND 1=1
+alert http $EXTERNAL_NET any -> $HTTP_SERVERS any (msg:"ATTACK: SQL Injection (AND 1=1)"; flow:established,to_server; content:"AND"; nocase; content:"1=1"; nocase; distance:0; within:10; http_client_body; classtype:web-application-attack; sid:1000014; rev:1;)
 
-# --- DETECCIÓN DE RED Y ACCESO (100% SURICATA) ---
+# --- SQL INJECTION AVANZADA (UNION-BASED) ---
+# Detectar UNION SELECT
+alert http $EXTERNAL_NET any -> $HTTP_SERVERS any (msg:"ATTACK: SQL Injection (UNION SELECT) in URI"; flow:established,to_server; content:"UNION"; nocase; content:"SELECT"; nocase; distance:0; within:20; http_uri; classtype:web-application-attack; sid:1000005; rev:2;)
+alert http $EXTERNAL_NET any -> $HTTP_SERVERS any (msg:"ATTACK: SQL Injection (UNION SELECT) in Body"; flow:established,to_server; content:"UNION"; nocase; content:"SELECT"; nocase; distance:0; within:20; http_client_body; classtype:web-application-attack; sid:1000006; rev:2;)
+
+# Detectar UNION ALL SELECT
+alert http $EXTERNAL_NET any -> $HTTP_SERVERS any (msg:"ATTACK: SQL Injection (UNION ALL SELECT)"; flow:established,to_server; content:"UNION"; nocase; content:"ALL"; nocase; content:"SELECT"; nocase; http_client_body; classtype:web-application-attack; sid:1000015; rev:1;)
+
+# --- SQL COMMENTS (TÉCNICA DE EVASIÓN) ---
+# Detectar comentarios SQL -- (doble guion)
+alert http $EXTERNAL_NET any -> $HTTP_SERVERS any (msg:"ATTACK: SQL Injection - SQL Comment (--) in Body"; flow:established,to_server; content:"--"; http_client_body; classtype:web-application-attack; sid:1000016; rev:1;)
+alert http $EXTERNAL_NET any -> $HTTP_SERVERS any (msg:"ATTACK: SQL Injection - SQL Comment (--) in URI"; flow:established,to_server; content:"--"; http_uri; classtype:web-application-attack; sid:1000017; rev:1;)
+
+# Detectar comentarios SQL /* */ (estilo C)
+alert http $EXTERNAL_NET any -> $HTTP_SERVERS any (msg:"ATTACK: SQL Injection - SQL Comment (/*) in Body"; flow:established,to_server; content:"/*"; http_client_body; classtype:web-application-attack; sid:1000018; rev:1;)
+alert http $EXTERNAL_NET any -> $HTTP_SERVERS any (msg:"ATTACK: SQL Injection - SQL Comment (/*) in URI"; flow:established,to_server; content:"/*"; http_uri; classtype:web-application-attack; sid:1000019; rev:1;)
+
+# Detectar comentario de cierre */
+alert http $EXTERNAL_NET any -> $HTTP_SERVERS any (msg:"ATTACK: SQL Injection - SQL Comment Close (*/)"; flow:established,to_server; content:"*/"; http_client_body; classtype:web-application-attack; sid:1000020; rev:1;)
+
+# --- EXTRACCIÓN DE DATOS (INFORMATION SCHEMA) ---
+# Detectar acceso a information_schema (enumeración de base de datos)
+alert http $EXTERNAL_NET any -> $HTTP_SERVERS any (msg:"ATTACK: SQL Injection - Information Schema Access"; flow:established,to_server; content:"information_schema"; nocase; http_client_body; classtype:web-application-attack; sid:1000021; rev:1;)
+alert http $EXTERNAL_NET any -> $HTTP_SERVERS any (msg:"ATTACK: SQL Injection - Information Schema in URI"; flow:established,to_server; content:"information_schema"; nocase; http_uri; classtype:web-application-attack; sid:1000022; rev:1;)
+
+# Detectar extracción de nombres de tablas
+alert http $EXTERNAL_NET any -> $HTTP_SERVERS any (msg:"ATTACK: SQL Injection - Table Enumeration"; flow:established,to_server; content:"table_name"; nocase; http_client_body; classtype:web-application-attack; sid:1000023; rev:1;)
+
+# Detectar extracción de nombres de columnas
+alert http $EXTERNAL_NET any -> $HTTP_SERVERS any (msg:"ATTACK: SQL Injection - Column Enumeration"; flow:established,to_server; content:"column_name"; nocase; http_client_body; classtype:web-application-attack; sid:1000024; rev:1;)
+
+# --- FUNCIONES SQL PELIGROSAS ---
+# Detectar CONCAT (usado para extraer datos)
+alert http $EXTERNAL_NET any -> $HTTP_SERVERS any (msg:"ATTACK: SQL Injection - CONCAT Function"; flow:established,to_server; content:"CONCAT"; nocase; http_client_body; classtype:web-application-attack; sid:1000025; rev:1;)
+
+# Detectar GROUP_CONCAT
+alert http $EXTERNAL_NET any -> $HTTP_SERVERS any (msg:"ATTACK: SQL Injection - GROUP_CONCAT Function"; flow:established,to_server; content:"GROUP_CONCAT"; nocase; http_client_body; classtype:web-application-attack; sid:1000026; rev:1;)
+
+# Detectar LOAD_FILE (lectura de archivos del sistema)
+alert http $EXTERNAL_NET any -> $HTTP_SERVERS any (msg:"ATTACK: SQL Injection - LOAD_FILE Function"; flow:established,to_server; content:"LOAD_FILE"; nocase; http_client_body; classtype:web-application-attack; sid:1000027; rev:1;)
+
+# Detectar INTO OUTFILE (escritura de archivos)
+alert http $EXTERNAL_NET any -> $HTTP_SERVERS any (msg:"ATTACK: SQL Injection - INTO OUTFILE"; flow:established,to_server; content:"INTO"; nocase; content:"OUTFILE"; nocase; http_client_body; classtype:web-application-attack; sid:1000028; rev:1;)
+
+# --- TIME-BASED SQL INJECTION ---
+# Detectar SLEEP (inyección basada en tiempo)
+alert http $EXTERNAL_NET any -> $HTTP_SERVERS any (msg:"ATTACK: SQL Injection - SLEEP Function (Time-Based)"; flow:established,to_server; content:"SLEEP"; nocase; http_client_body; classtype:web-application-attack; sid:1000029; rev:1;)
+
+# Detectar BENCHMARK (inyección basada en tiempo)
+alert http $EXTERNAL_NET any -> $HTTP_SERVERS any (msg:"ATTACK: SQL Injection - BENCHMARK Function"; flow:established,to_server; content:"BENCHMARK"; nocase; http_client_body; classtype:web-application-attack; sid:1000030; rev:1;)
+
+# Detectar WAITFOR DELAY (SQL Server)
+alert http $EXTERNAL_NET any -> $HTTP_SERVERS any (msg:"ATTACK: SQL Injection - WAITFOR DELAY (SQL Server)"; flow:established,to_server; content:"WAITFOR"; nocase; content:"DELAY"; nocase; http_client_body; classtype:web-application-attack; sid:1000031; rev:1;)
+
+# --- BOOLEAN-BASED SQL INJECTION ---
+# Detectar TRUE/FALSE
+alert http $EXTERNAL_NET any -> $HTTP_SERVERS any (msg:"ATTACK: SQL Injection - Boolean True"; flow:established,to_server; content:"' AND '1'='1"; http_client_body; classtype:web-application-attack; sid:1000032; rev:1;)
+alert http $EXTERNAL_NET any -> $HTTP_SERVERS any (msg:"ATTACK: SQL Injection - Boolean False"; flow:established,to_server; content:"' AND '1'='2"; http_client_body; classtype:web-application-attack; sid:1000033; rev:1;)
+
+# --- DETECCIÓN DE ESCANEO MASIVO ---
+# Detectar múltiples intentos de SQL Injection (posible escaneo automatizado)
+alert http $EXTERNAL_NET any -> $HTTP_SERVERS any (msg:"SCAN: Multiple SQL Injection Attempts Detected"; flow:established,to_server; content:"SELECT"; nocase; threshold:type threshold, track by_src, count 10, seconds 60; classtype:attempted-recon; sid:1000034; rev:1;)
+
+# Detectar múltiples peticiones con UNION (escaneo de columnas)
+alert http $EXTERNAL_NET any -> $HTTP_SERVERS any (msg:"SCAN: Multiple UNION SELECT Attempts"; flow:established,to_server; content:"UNION"; nocase; threshold:type threshold, track by_src, count 5, seconds 30; classtype:attempted-recon; sid:1000035; rev:1;)
+
+# --- XSS (CROSS-SITE SCRIPTING) ---
+# Detectar XSS con <script>
+alert http $EXTERNAL_NET any -> $HTTP_SERVERS any (msg:"ATTACK: XSS - Script Tag in URI"; flow:established,to_server; content:"<script>"; nocase; http_uri; classtype:web-application-attack; sid:1000003; rev:2;)
+alert http $EXTERNAL_NET any -> $HTTP_SERVERS any (msg:"ATTACK: XSS - Script Tag in Body"; flow:established,to_server; content:"<script>"; nocase; http_client_body; classtype:web-application-attack; sid:1000004; rev:2;)
+
+# Detectar XSS con javascript:
+alert http $EXTERNAL_NET any -> $HTTP_SERVERS any (msg:"ATTACK: XSS - Javascript Protocol"; flow:established,to_server; content:"javascript:"; nocase; http_client_body; classtype:web-application-attack; sid:1000036; rev:1;)
+
+# Detectar XSS con onerror
+alert http $EXTERNAL_NET any -> $HTTP_SERVERS any (msg:"ATTACK: XSS - onerror Event Handler"; flow:established,to_server; content:"onerror"; nocase; http_client_body; classtype:web-application-attack; sid:1000037; rev:1;)
+
+# --- LDAP INJECTION ---
+# Detectar LDAP Injection básica
+alert http $EXTERNAL_NET any -> $HTTP_SERVERS any (msg:"ATTACK: LDAP Injection - Wildcard (*)"; flow:established,to_server; content:"*)("; http_client_body; classtype:web-application-attack; sid:1000038; rev:1;)
+alert http $EXTERNAL_NET any -> $HTTP_SERVERS any (msg:"ATTACK: LDAP Injection - OR Filter"; flow:established,to_server; content:")(|"; http_client_body; classtype:web-application-attack; sid:1000039; rev:1;)
+
+# --- DETECCIÓN DE RED Y ACCESO ---
 # Detectar PING (ICMP) hacia el servidor
-alert icmp any any -> $HOME_NET any (msg:"ICMP Ping Detectado (Reconocimiento Red)"; itype:8; classtype:misc-activity; sid:1000007; rev:1;)
+alert icmp any any -> $HOME_NET any (msg:"RECON: ICMP Ping Detected (Network Reconnaissance)"; itype:8; classtype:misc-activity; sid:1000007; rev:2;)
 
-# Detectar intentos de SSH (Acceso al puerto 22)
-alert tcp any any -> $HOME_NET 22 (msg:"INTENTO DE ACCESO SSH"; flow:to_server; flags:S; classtype:suspicious-login; sid:1000008; rev:1;)
+# Detectar intentos de SSH
+alert tcp any any -> $HOME_NET 22 (msg:"ACCESS: SSH Connection Attempt"; flow:to_server; flags:S; classtype:suspicious-login; sid:1000008; rev:2;)
 
 # Detectar escaneo de puertos (Nmap/SYN Scan)
-alert tcp any any -> $HOME_NET any (msg:"POSSIBLE Port Scan (SYN Flags)"; flags:S; threshold:type both, track by_src, count 20, seconds 10; classtype:attempted-recon; sid:1000009; rev:1;)
+alert tcp any any -> $HOME_NET any (msg:"SCAN: Possible Port Scan (SYN Flags)"; flags:S; threshold:type both, track by_src, count 20, seconds 10; classtype:attempted-recon; sid:1000009; rev:2;)
 
 # --- AUDITORÍA DE ACCESO A DATOS ---
 # Detectar cualquier tráfico establecido hacia MySQL (Puerto 3306)
-alert tcp any any -> $HOME_NET 3306 (msg:"CONSULTA / ACCESO A BASE DE DATOS"; flow:to_server,established; classtype:policy-violation; sid:1000010; rev:1;)
+alert tcp any any -> $HOME_NET 3306 (msg:"AUDIT: Database Access (MySQL Port 3306)"; flow:to_server,established; classtype:policy-violation; sid:1000010; rev:2;)
+
+# Detectar acceso a PostgreSQL
+alert tcp any any -> $HOME_NET 5432 (msg:"AUDIT: Database Access (PostgreSQL Port 5432)"; flow:to_server,established; classtype:policy-violation; sid:1000040; rev:1;)
+
+# --- COMMAND INJECTION ---
+# Detectar Command Injection básica
+alert http $EXTERNAL_NET any -> $HTTP_SERVERS any (msg:"ATTACK: Command Injection - Pipe Character"; flow:established,to_server; content:"|"; http_client_body; classtype:web-application-attack; sid:1000041; rev:1;)
+alert http $EXTERNAL_NET any -> $HTTP_SERVERS any (msg:"ATTACK: Command Injection - Semicolon"; flow:established,to_server; content:";"; http_client_body; classtype:web-application-attack; sid:1000042; rev:1;)
+
+# Detectar comandos del sistema
+alert http $EXTERNAL_NET any -> $HTTP_SERVERS any (msg:"ATTACK: Command Injection - /bin/bash"; flow:established,to_server; content:"/bin/bash"; nocase; http_client_body; classtype:web-application-attack; sid:1000043; rev:1;)
+alert http $EXTERNAL_NET any -> $HTTP_SERVERS any (msg:"ATTACK: Command Injection - /bin/sh"; flow:established,to_server; content:"/bin/sh"; nocase; http_client_body; classtype:web-application-attack; sid:1000044; rev:1;)
