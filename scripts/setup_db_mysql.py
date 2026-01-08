@@ -339,8 +339,168 @@ def setup_db_config():
         print(f"[!] ADVERTENCIA: No se pudo conectar con el Dashboard en {admin_ip}:5000.")
         print(f"    Verifica que el script main.py esté corriendo en el Servidor Admin.")
 
-    # 8. Verificación Final de la Base de Datos
-    print("\n[*] Realizando verificación final de la base de datos...")
+    # 9. DIAGNÓSTICO DE SURICATA Y LOG SHIPPER
+    print("\n" + "="*50)
+    print("   DIAGNÓSTICO DE MONITOREO DE SEGURIDAD")
+    print("="*50)
+    
+    # Verificar si Suricata está instalado
+    suricata_installed = check_package_installed("suricata")
+    print(f"\n[*] Suricata instalado: {'SÍ' if suricata_installed else 'NO'}")
+    
+    if suricata_installed:
+        # Verificar si Suricata está corriendo
+        try:
+            result = subprocess.run(["systemctl", "is-active", "suricata"], capture_output=True, text=True)
+            suricata_running = result.stdout.strip() == "active"
+            print(f"[*] Suricata corriendo: {'SÍ' if suricata_running else 'NO'}")
+            
+            if not suricata_running:
+                print("[!] ADVERTENCIA: Suricata NO está corriendo")
+                print("    Ejecuta: sudo systemctl start suricata")
+        except:
+            print("[!] No se pudo verificar el estado de Suricata")
+        
+        # Verificar reglas cargadas
+        if os.path.exists("/etc/suricata/rules/local.rules"):
+            try:
+                with open("/etc/suricata/rules/local.rules", "r") as f:
+                    rules_content = f.read()
+                    rule_count = rules_content.count("alert ")
+                    
+                print(f"[OK] Reglas personalizadas: {rule_count} reglas cargadas")
+                
+                # Verificar reglas específicas importantes
+                has_mysql = "3306" in rules_content
+                has_ssh = "22" in rules_content and "SSH" in rules_content
+                has_ping = "icmp" in rules_content
+                
+                print(f"    - Detección MySQL (3306): {'✓' if has_mysql else '✗'}")
+                print(f"    - Detección SSH (22): {'✓' if has_ssh else '✗'}")
+                print(f"    - Detección PING (ICMP): {'✓' if has_ping else '✗'}")
+            except:
+                print("[!] No se pudo leer /etc/suricata/rules/local.rules")
+        else:
+            print("[!] ADVERTENCIA: No se encontró /etc/suricata/rules/local.rules")
+            print("    Las reglas personalizadas NO están instaladas")
+        
+        # Verificar archivo de logs de Suricata
+        if os.path.exists("/var/log/suricata/eve.json"):
+            try:
+                file_size = os.path.getsize("/var/log/suricata/eve.json")
+                print(f"[OK] Archivo de logs: /var/log/suricata/eve.json ({file_size} bytes)")
+                
+                # Leer últimas líneas para ver si hay actividad
+                result = subprocess.run(["tail", "-n", "5", "/var/log/suricata/eve.json"], 
+                                      capture_output=True, text=True)
+                if result.stdout.strip():
+                    print("[OK] Suricata está generando logs")
+                else:
+                    print("[!] El archivo de logs está vacío (sin actividad aún)")
+            except:
+                print("[!] No se pudo verificar /var/log/suricata/eve.json")
+        else:
+            print("[!] ADVERTENCIA: /var/log/suricata/eve.json no existe")
+    else:
+        print("[!] ADVERTENCIA: Suricata NO está instalado")
+        print("    Ejecuta nuevamente el script y acepta instalar Suricata")
+    
+    # Verificar Log Shipper
+    print(f"\n[*] Verificando Log Shipper...")
+    try:
+        result = subprocess.run(["systemctl", "is-active", "log-shipper"], capture_output=True, text=True)
+        shipper_running = result.stdout.strip() == "active"
+        print(f"[*] Log Shipper corriendo: {'SÍ' if shipper_running else 'NO'}")
+        
+        if shipper_running:
+            print("[OK] Log Shipper está enviando alertas al Dashboard")
+            
+            # Mostrar últimas líneas del log del shipper
+            try:
+                result = subprocess.run(["journalctl", "-u", "log-shipper", "-n", "3", "--no-pager"], 
+                                      capture_output=True, text=True)
+                if result.stdout.strip():
+                    print("\n[*] Últimas líneas del Log Shipper:")
+                    for line in result.stdout.strip().split("\n")[-3:]:
+                        if line.strip():
+                            print(f"    {line}")
+            except:
+                pass
+        else:
+            print("[!] ADVERTENCIA: Log Shipper NO está corriendo")
+            print("    Ejecuta: sudo systemctl start log-shipper")
+    except:
+        print("[!] Log Shipper NO está instalado")
+        print("    Ejecuta nuevamente el script y acepta instalar el Log Shipper")
+    
+    # Verificar conectividad con Dashboard
+    print(f"\n[*] Verificando conectividad con Dashboard ({admin_ip}:5000)...")
+    if dash_test:
+        print(f"[OK] Dashboard ACCESIBLE - Las alertas llegarán correctamente")
+    else:
+        print(f"[!] ADVERTENCIA: Dashboard NO ACCESIBLE")
+        print(f"    Verifica que main.py esté corriendo en {admin_ip}")
+        print(f"    Verifica el firewall y las reglas de red")
+    
+    # Resumen de qué se detectará
+    print("\n" + "="*50)
+    print("   ¿QUÉ SE DETECTARÁ Y MOSTRARÁ EN EL DASHBOARD?")
+    print("="*50)
+    
+    if suricata_installed and shipper_running:
+        print("\n✓ Accesos a MySQL (puerto 3306)")
+        print("  - Conexiones desde Nginx (AUTHORIZED)")
+        print("  - Conexiones desde otras IPs (UNAUTHORIZED ACCESS)")
+        print("\n✓ Intentos de SSH (puerto 22)")
+        print("  - Cualquier intento de conexión SSH")
+        print("\n✓ Pings (ICMP)")
+        print("  - Detección de reconocimiento de red")
+        print("\n✓ Escaneo de puertos")
+        print("  - Detección de Nmap y otros scanners")
+        print("\n✓ Métricas del sistema")
+        print("  - CPU y RAM en tiempo real")
+    else:
+        print("\n[!] CONFIGURACIÓN INCOMPLETA")
+        if not suricata_installed:
+            print("  ✗ Suricata NO instalado - No se detectarán ataques")
+        if not shipper_running:
+            print("  ✗ Log Shipper NO corriendo - No se enviarán alertas")
+    
+    # Instrucciones de prueba
+    print("\n" + "="*50)
+    print("   CÓMO PROBAR QUE FUNCIONA")
+    print("="*50)
+    print("\n1. Desde otra máquina, intenta conectarte a MySQL:")
+    print(f"   mysql -h {db_host} -u {db_user} -p")
+    print("\n2. Desde otra máquina, haz ping:")
+    print(f"   ping {db_host}")
+    print("\n3. Intenta SSH:")
+    print(f"   ssh usuario@{db_host}")
+    print("\n4. Abre el Dashboard:")
+    print(f"   http://{admin_ip}:5000")
+    print("\n5. Verás las alertas en 'Security Alerts (Database)'")
+    print("   - Accesos autorizados en AZUL")
+    print("   - Accesos no autorizados en ROJO")
+    
+    # Comandos útiles para diagnóstico
+    print("\n" + "="*50)
+    print("   COMANDOS ÚTILES PARA DIAGNÓSTICO")
+    print("="*50)
+    print("\n# Ver logs de Suricata en tiempo real:")
+    print("sudo tail -f /var/log/suricata/eve.json | jq 'select(.event_type==\"alert\")'")
+    print("\n# Ver estado de servicios:")
+    print("sudo systemctl status suricata")
+    print("sudo systemctl status log-shipper")
+    print("\n# Ver logs del Log Shipper:")
+    print("sudo journalctl -u log-shipper -f")
+    print("\n# Reiniciar servicios si es necesario:")
+    print("sudo systemctl restart suricata")
+    print("sudo systemctl restart log-shipper")
+
+    # 10. Verificación Final de la Base de Datos
+    print("\n" + "="*50)
+    print("   VERIFICACIÓN FINAL DE MYSQL")
+    print("="*50)
     is_healthy = check_db_health(db_user, db_pass, db_host, db_name)
     
     print("\n" + "="*50)
@@ -351,6 +511,8 @@ def setup_db_config():
         print(f"   Usuario: {db_user}")
         print(f"   Escuchando en: 0.0.0.0:3306")
         print(f"   Conectividad Admin: {'OK' if dash_test else 'FALLIDA'}")
+        print(f"   Suricata: {'ACTIVO' if suricata_installed else 'NO INSTALADO'}")
+        print(f"   Log Shipper: {'ACTIVO' if shipper_running else 'NO ACTIVO'}")
     else:
         print("   ¡CONFIGURACIÓN COMPLETADA CON ADVERTENCIAS!")
         print("   Estado de MySQL: OFFLINE (Verifica credenciales o red)")
