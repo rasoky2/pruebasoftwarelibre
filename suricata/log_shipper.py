@@ -55,37 +55,65 @@ def ship_suricata_logs():
     possible_paths = [
         os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".env")), # Desde suricata/..
         "/var/www/html/pruebasoftwarelibre/.env", # Ruta absoluta estándar
+        "/root/Descargas/pruebasoftwarelibre/.env", # Ruta de desarrollo
         os.path.join(os.getcwd(), ".env") # Ruta actual
     ]
     
     env_loaded = False
-    for env_path in possible_paths:
-        if os.path.exists(env_path):
-            load_dotenv(env_path)
-            print(f"[*] Configuración cargada desde: {env_path}")
+    for path in possible_paths:
+        if os.path.exists(path):
+            load_dotenv(path)
+            print(f"[OK] Archivo .env cargado desde: {path}")
             env_loaded = True
             break
-            
-    if not env_loaded:
-        print("[!] ADVERTENCIA: No se encontró archivo .env. Usando valores por defecto.")
     
+    if not env_loaded:
+        print("[!] ADVERTENCIA: No se encontró archivo .env en ninguna ubicación")
+        print(f"    Rutas buscadas: {possible_paths}")
+    
+    # Obtener configuración con valores por defecto
     admin_ip = os.getenv("ADMIN_IP", "127.0.0.1")
-    sensor_type = os.getenv("SENSOR_TYPE", "nginx") # 'nginx' o 'database'
+    sensor_type = os.getenv("SENSOR_TYPE", "unknown")
+    log_file = "/var/log/suricata/eve.json"
     dashboard_url = f"http://{admin_ip}:5000/api/heartbeat"
     local_ip = get_local_ip()
     
-    print(f"\n" + "="*50)
+    # Validar configuración crítica
+    if admin_ip == "127.0.0.1":
+        print("[!] ADVERTENCIA: ADMIN_IP no configurado, usando 127.0.0.1")
+        print("    Configura ADMIN_IP en el archivo .env")
+    
+    if sensor_type == "unknown":
+        print("[!] ADVERTENCIA: SENSOR_TYPE no configurado")
+        print("    Configura SENSOR_TYPE en el archivo .env")
+    
+    # Mostrar configuración
+    print("="*50)
     print(f"   LOG SHIPPER DINÁMICO [{sensor_type.upper()}]")
-    print(f"   Reportando a: {dashboard_url}")
+    print("="*50)
+    print(f"   Dashboard: {dashboard_url}")
     print(f"   IP Local: {local_ip}")
+    print(f"   Archivo de logs: {log_file}")
     print("="*50 + "\n")
+    
+    # Verificar que el archivo de logs existe
+    if not os.path.exists(log_file):
+        print(f"[!] ADVERTENCIA: {log_file} no existe")
+        print("[*] Creando archivo de logs...")
+        try:
+            os.makedirs(os.path.dirname(log_file), exist_ok=True)
+            open(log_file, 'a').close()
+            print(f"[OK] Archivo {log_file} creado")
+        except Exception as e:
+            print(f"[!] ERROR: No se pudo crear {log_file}: {e}")
+            print("[!] El Log Shipper no puede continuar sin el archivo de logs")
+            return
     
     # INICIAR HILO DE MÉTRICAS (Heartbeat)
     # Esto asegura que las métricas de CPU/RAM se envíen cada 10s independientemente de los logs
     heartbeat_thread = threading.Thread(target=send_heartbeat_loop, args=(dashboard_url, local_ip, sensor_type), daemon=True)
     heartbeat_thread.start()
     
-    # TAIL DE LOGS DE SURICATA (Alertas)
     if not os.path.exists(log_file):
         print(f"[!] Archivo de log {log_file} no encontrado. Creando...")
         try: 
