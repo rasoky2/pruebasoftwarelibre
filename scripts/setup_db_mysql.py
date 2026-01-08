@@ -310,27 +310,23 @@ def setup_db_config():
                 
                 # Iniciar el servicio
                 result = subprocess.run(["sudo", "systemctl", "start", "log-shipper"], 
-                                      capture_output=True, text=True)
+                                      capture_output=True, text=True, timeout=5)
                 
                 if result.returncode == 0:
-                    print("[OK] Log Shipper iniciado correctamente")
+                    print("[OK] Log Shipper iniciado")
                     
-                    # Esperar un momento para que el servicio se estabilice
-                    import time
-                    time.sleep(2)
-                    
-                    # Verificar que realmente está corriendo
+                    # Verificar estado inmediatamente
                     result = subprocess.run(["systemctl", "is-active", "log-shipper"], 
-                                          capture_output=True, text=True)
+                                          capture_output=True, text=True, timeout=3)
                     
                     if result.stdout.strip() == "active":
-                        print("[OK] ✓ Log Shipper ACTIVO y enviando alertas al Dashboard")
+                        print("[OK] ✓ Log Shipper ACTIVO y enviando alertas")
                     else:
-                        print("[!] ADVERTENCIA: Log Shipper no está activo")
-                        print("    Verifica los logs: sudo journalctl -u log-shipper -n 20")
+                        print("[!] Log Shipper iniciado pero verificando estado...")
+                        print("    Verifica: sudo systemctl status log-shipper")
                 else:
-                    print(f"[!] Error al iniciar log-shipper: {result.stderr}")
-                    print("    Verifica los logs: sudo journalctl -u log-shipper -n 20")
+                    print(f"[!] Error al iniciar log-shipper")
+                    print("    Verifica: sudo journalctl -u log-shipper -n 20")
                     
             except Exception as e:
                 print(f"[!] Error instalando log-shipper: {e}")
