@@ -293,13 +293,51 @@ def setup_db_config():
                 temp_shipper = "/tmp/log-shipper.service"
                 with open(temp_shipper, 'w') as f: f.write(content)
                 
+                # Copiar servicio
                 subprocess.run(["sudo", "cp", temp_shipper, service_dst], check=True)
+                print("[OK] Archivo de servicio copiado")
+                
+                # Recargar systemd
                 subprocess.run(["sudo", "systemctl", "daemon-reload"], check=True)
+                print("[OK] Systemd recargado")
+                
+                # Detener el servicio si está corriendo (para reinicio limpio)
+                subprocess.run(["sudo", "systemctl", "stop", "log-shipper"], check=False)
+                
+                # Habilitar para inicio automático
                 subprocess.run(["sudo", "systemctl", "enable", "log-shipper"], check=True)
-                subprocess.run(["sudo", "systemctl", "restart", "log-shipper"], check=True)
-                print("[OK] Log Shipper de Seguridad activo en DB con ruta detectada.")
+                print("[OK] Log Shipper habilitado para inicio automático")
+                
+                # Iniciar el servicio
+                result = subprocess.run(["sudo", "systemctl", "start", "log-shipper"], 
+                                      capture_output=True, text=True)
+                
+                if result.returncode == 0:
+                    print("[OK] Log Shipper iniciado correctamente")
+                    
+                    # Esperar un momento para que el servicio se estabilice
+                    import time
+                    time.sleep(2)
+                    
+                    # Verificar que realmente está corriendo
+                    result = subprocess.run(["systemctl", "is-active", "log-shipper"], 
+                                          capture_output=True, text=True)
+                    
+                    if result.stdout.strip() == "active":
+                        print("[OK] ✓ Log Shipper ACTIVO y enviando alertas al Dashboard")
+                    else:
+                        print("[!] ADVERTENCIA: Log Shipper no está activo")
+                        print("    Verifica los logs: sudo journalctl -u log-shipper -n 20")
+                else:
+                    print(f"[!] Error al iniciar log-shipper: {result.stderr}")
+                    print("    Verifica los logs: sudo journalctl -u log-shipper -n 20")
+                    
             except Exception as e:
                 print(f"[!] Error instalando log-shipper: {e}")
+                print("    Intenta manualmente: sudo systemctl start log-shipper")
+        else:
+            print(f"[!] No se encontró {service_src}")
+            print("    El Log Shipper NO se instaló")
 
     # 7. Instalación del Servicio Heartbeat (Python)
     if input("\n¿Desea instalar/actualizar el servicio de latido (Heartbeat) para el Dashboard? (s/N): ").lower() == 's':
